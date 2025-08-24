@@ -9,5 +9,5 @@ services:
     env_file:
       - .env
     volumes:
-      - .:/app
+      - /var/www/hono-bot-wa:/app
     command: bun run --hot src/index.ts
