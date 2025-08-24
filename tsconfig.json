@@ -1,16 +1,20 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "jsx": "react-jsx",
-    "jsxImportSource": "hono/jsx",
-    "baseUrl": ".",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "lib": ["ESNext", "DOM"],
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     },
     "types": ["node"],
     "strict": true,
-    "skipLibCheck": true
-  }
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
 }
