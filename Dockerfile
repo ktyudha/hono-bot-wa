@@ -1,23 +1,17 @@
-# Gunakan Node.js 20 sebagai base
-FROM node:20-alpine
+# Gunakan Bun resmi
+FROM jarredsumner/bun:latest
 
 # Set working directory
-WORKDIR /usr/src/app
+WORKDIR /app
 
-# Copy package.json & lockfile
-COPY package*.json ./
+# Salin package.json dan bun.lockb dulu untuk caching
+COPY package.json bun.lockb* ./
 
 # Install dependencies
-RUN npm install
+RUN bun install
 
-# Copy semua source code
+# Salin semua source code dan .env
 COPY . .
 
-# Build TypeScript (jika pakai TS)
-RUN npm run build
-
-# Expose port Hono
-EXPOSE 3000
-
-# Jalankan server
-CMD ["node", "dist/index.js"]
+# Jalankan Hono langsung (hot reload)
+CMD ["bun", "run", "--hot", "src/index.ts"]
