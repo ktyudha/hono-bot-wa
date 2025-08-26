@@ -80,7 +80,18 @@ export class WhatsAppService {
 
     try {
       // Format nomor harus dengan kode negara
-      const formattedNumber = to.replace(/\D/g, "");
+      let formattedNumber = to.replace(/\D/g, "");
+
+      // Jika dimulai dengan '0', ganti jadi '62'
+      if (formattedNumber.startsWith("0")) {
+        formattedNumber = "62" + formattedNumber.slice(1);
+      }
+
+      // Jika tidak diawali '62', tambahkan '62' di depan
+      else if (!formattedNumber.startsWith("62")) {
+        formattedNumber = "62" + formattedNumber;
+      }
+
       const chatId = `${formattedNumber}@c.us`;
 
       await this.client.sendMessage(chatId, message);
