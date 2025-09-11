@@ -16,10 +16,36 @@ whatsappRouter.post("/send-message", (c) => whatsappController.sendMessage(c));
 // Send media
 whatsappRouter.post("/send-media", (c) => whatsappController.sendMedia(c));
 
+// Send message to group
+whatsappRouter.post("/send-message-group", (c) =>
+  whatsappController.sendMessageToGroup(c)
+);
+
+// Send media to group
+whatsappRouter.post("/send-media-group", (c) =>
+  whatsappController.sendMediaToGroup(c)
+);
+
 // Get chats
 whatsappRouter.get("/chats", (c) => whatsappController.getChats(c));
 
+// Get messages from a personal chat
+whatsappRouter.get("/chat-messages", (c) =>
+  whatsappController.getChatMessages(c)
+);
+
+// Get groups only
+whatsappRouter.get("/groups", (c) => whatsappController.getGroups(c));
+
+// Get messages from a group
+whatsappRouter.get("/group-messages", (c) =>
+  whatsappController.getGroupMessages(c)
+);
+
 // Logout
 whatsappRouter.post("/logout", (c) => whatsappController.logout(c));
+
+// Destroy client
+whatsappRouter.post("/destroy", (c) => whatsappController.destroy(c));
 
 export default whatsappRouter;

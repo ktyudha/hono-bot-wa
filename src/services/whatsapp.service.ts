@@ -1,5 +1,12 @@
-import { Client, LocalAuth, Message, MessageMedia } from "whatsapp-web.js";
+import {
+  Client,
+  LocalAuth,
+  Message,
+  MessageMedia,
+  GroupChat,
+} from "whatsapp-web.js";
 import * as qrcode from "qrcode-terminal";
+import { formatPhoneNumber } from "@/helpers/formatPhoneNumber";
 
 export class WhatsAppService {
   private client: Client;
@@ -66,7 +73,7 @@ export class WhatsAppService {
   public async initialize(): Promise<void> {
     try {
       await this.client.initialize();
-      console.log("WhatsApp client initialized");
+      console.log("WhatsApp client: initialized");
     } catch (error) {
       console.error("Failed to initialize WhatsApp client:", error);
       throw error;
@@ -75,29 +82,15 @@ export class WhatsAppService {
 
   public async sendMessage(to: string, message: string): Promise<void> {
     if (!this.isReady) {
-      throw new Error("WhatsApp client is not ready");
+      throw new Error("WhatsApp client: not ready");
     }
 
     try {
-      // Format nomor harus dengan kode negara
-      let formattedNumber = to.replace(/\D/g, "");
-
-      // Jika dimulai dengan '0', ganti jadi '62'
-      if (formattedNumber.startsWith("0")) {
-        formattedNumber = "62" + formattedNumber.slice(1);
-      }
-
-      // Jika tidak diawali '62', tambahkan '62' di depan
-      else if (!formattedNumber.startsWith("62")) {
-        formattedNumber = "62" + formattedNumber;
-      }
-
-      const chatId = `${formattedNumber}@c.us`;
-
+      const chatId = await this.toWhatsAppId(to);
       await this.client.sendMessage(chatId, message);
-      console.log(`Message sent to ${to}`);
+      console.log(`Message sent to: ${chatId}`);
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error("Message sent error:", error);
       throw error;
     }
   }
@@ -107,27 +100,56 @@ export class WhatsAppService {
     mediaUrl: string,
     caption?: string
   ): Promise<void> {
-    if (!this.isReady) {
-      throw new Error("WhatsApp client is not ready");
-    }
+    if (!this.isReady) throw new Error("WhatsApp client is not ready");
 
     try {
-      const formattedNumber = to.replace(/\D/g, "");
-      const chatId = `${formattedNumber}@c.us`;
+      const chatId = await this.toWhatsAppId(to);
       const media = await MessageMedia.fromUrl(mediaUrl);
 
       await this.client.sendMessage(chatId, media, { caption });
-      console.log(`Media sent to ${to}`);
+      console.log(`Media sent to: ${chatId}`);
     } catch (error) {
       console.error("Error sending media:", error);
       throw error;
     }
   }
 
-  public async getChats(): Promise<any[]> {
-    if (!this.isReady) {
-      throw new Error("WhatsApp client is not ready");
+  public async sendMessageToGroup(
+    groupId: string,
+    message: string
+  ): Promise<void> {
+    if (!this.isReady) throw new Error("WhatsApp client is not ready");
+
+    try {
+      const chatId = await this.toWhatsAppId(groupId, true);
+      await this.client.sendMessage(chatId, message);
+      console.log(`Message sent to group: ${groupId}`);
+    } catch (error) {
+      console.error("Error sending message to group:", error);
+      throw error;
     }
+  }
+
+  public async sendMediaToGroup(
+    groupId: string,
+    mediaUrl: string,
+    caption?: string
+  ): Promise<void> {
+    if (!this.isReady) throw new Error("WhatsApp client is not ready");
+
+    try {
+      const chatId = await this.toWhatsAppId(groupId, true);
+      const media = await MessageMedia.fromUrl(mediaUrl);
+      await this.client.sendMessage(chatId, media, { caption });
+      console.log(`Media sent to group: ${groupId}`);
+    } catch (error) {
+      console.error("Error sending media to group:", error);
+      throw error;
+    }
+  }
+
+  public async getChats(): Promise<any[]> {
+    if (!this.isReady) throw new Error("WhatsApp client is not ready");
 
     try {
       const chats = await this.client.getChats();
@@ -141,6 +163,58 @@ export class WhatsAppService {
       console.error("Error getting chats:", error);
       throw error;
     }
+  }
+
+  public async getGroups(): Promise<any[]> {
+    if (!this.isReady) throw new Error("WhatsApp client is not ready");
+
+    const chats = await this.client.getChats();
+
+    return chats
+      .filter((chat) => chat.isGroup)
+      .map((chat) => {
+        const groupChat = chat as GroupChat;
+
+        return {
+          id: groupChat.id._serialized,
+          name: groupChat.name,
+          participants: groupChat.participants.length,
+        };
+      });
+  }
+
+  public async getGroupMessages(groupId: string, limit: number = 10) {
+    if (!this.isReady) throw new Error("WhatsApp client is not ready");
+
+    const chatId = await this.toWhatsAppId(groupId, true);
+    const chat = await this.client.getChatById(chatId);
+    const messages = await chat.fetchMessages({ limit });
+
+    return messages.map((msg) => ({
+      id: msg.id._serialized,
+      from: msg.from,
+      body: msg.body,
+      timestamp: msg.timestamp,
+      isFromMe: msg.fromMe,
+      type: msg.type,
+    }));
+  }
+
+  public async getChatMessages(to: string, limit: number = 10) {
+    if (!this.isReady) throw new Error("WhatsApp client is not ready");
+
+    const chatId = await this.toWhatsAppId(to);
+    const chat = await this.client.getChatById(chatId);
+    const messages = await chat.fetchMessages({ limit });
+
+    return messages.map((msg) => ({
+      id: msg.id._serialized,
+      from: msg.from,
+      body: msg.body,
+      timestamp: msg.timestamp,
+      isFromMe: msg.fromMe,
+      type: msg.type,
+    }));
   }
 
   public getStatus(): { isReady: boolean; isAuthenticated: boolean } {
@@ -170,6 +244,17 @@ export class WhatsAppService {
       console.error("Error destroying client:", error);
       throw error;
     }
+  }
+
+  private async toWhatsAppId(target: string, isGroup = false): Promise<string> {
+    const extGroup = "@g.us";
+    const extChat = "@c.us";
+
+    if (target.endsWith(extChat) || target.endsWith(extGroup)) return target;
+    if (!isGroup) return formatPhoneNumber(target) + extChat;
+    if (isGroup) return target + extGroup;
+
+    return `${target}`;
   }
 }
 
