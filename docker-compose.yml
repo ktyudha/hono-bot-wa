@@ -3,13 +3,12 @@ version: "3.8"
 services:
   bot:
     build: .
-    container_name: api-bot-wa
+    container_name: hono-bot-wa
     ports:
       - "${PORT:-1997}:${PORT:-1997}"
     env_file:
       - .env
     volumes:
-      - /var/www/hono-bot-wa:/app
       - /var/www/hono-bot-wa/.wwebjs_auth:/app/.wwebjs_auth
       - /var/www/hono-bot-wa/.wwebjs_cache:/app/.wwebjs_cache
     command: bun run --hot src/index.ts
