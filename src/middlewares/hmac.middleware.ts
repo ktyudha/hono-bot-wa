@@ -29,11 +29,11 @@ export const hmacMiddleware: MiddlewareHandler = async (c, next) => {
     return c.json({ error: "Unauthorized." }, 401);
   }
 
-  const body = await c.req.raw.clone().text();
+  // const body = await c.req.raw.clone().text();
 
   const expectedToken = crypto
     .createHmac("sha256", SECRET_KEY)
-    .update(body + timestamp)
+    .update(timestamp)
     .digest("hex");
 
   if (token !== expectedToken) {
