@@ -7,6 +7,11 @@ const whatsappRouter = new Hono();
 // Hmac Middleware
 whatsappRouter.use("*", hmacMiddleware);
 
+// Send Message Group / Chat
+whatsappRouter.post("/send-message-global", (c) =>
+  whatsappController.sendMessageGlobal(c)
+);
+
 // Get WhatsApp status
 whatsappRouter.get("/status", (c) => whatsappController.getStatus(c));
 
