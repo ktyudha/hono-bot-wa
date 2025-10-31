@@ -1,11 +1,73 @@
+# services:
+#   bot:
+#     build: .
+#     container_name: hono-bot-wa
+#     expose:
+#       - "${PORT:-1997}"
+#     env_file:
+#       - .env
+#     volumes:
+#       - /var/www/hono-bot-wa/.wwebjs_auth:/app/.wwebjs_auth
+#       - /var/www/hono-bot-wa/.wwebjs_cache:/app/.wwebjs_cache
+#     command: bun run --hot src/index.ts
+#   nginx:
+#     image: nginx:latest
+#     container_name: hono-proxy
+#     restart: unless-stopped
+#     ports:
+#       - "80:80"
+#       - "443:443"
+#     volumes:
+#       - ./nginx/conf.d:/etc/nginx/conf.d
+#       - ./certbot:/etc/letsencrypt
+#     depends_on:
+#       - bot
+
+version: "3.8"
+
 services:
+  nginx-proxy:
+    image: jwilder/nginx-proxy:latest
+    container_name: hono-nginx-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./certs:/etc/nginx/certs:rw
+      - ./vhost.d:/etc/nginx/vhost.d
+      - ./html:/usr/share/nginx/html
+    environment:
+      - DEFAULT_HOST=${DOMAIN}
+
+  nginx-proxy-acme:
+    image: nginxproxy/acme-companion
+    container_name: hono-nginx-ssl
+    restart: unless-stopped
+    depends_on:
+      - nginx-proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./certs:/etc/nginx/certs:rw
+      - ./vhost.d:/etc/nginx/vhost.d
+      - ./html:/usr/share/nginx/html
+    environment:
+      - DEFAULT_EMAIL=${EMAIL}
+
   bot:
     build: .
     container_name: hono-bot-wa
-    ports:
-      - "${PORT:-1997}:${PORT:-1997}"
+    restart: unless-stopped
     env_file:
       - .env
+    expose:
+      - "${PORT}"
+    environment:
+      - VIRTUAL_HOST=${DOMAIN}
+      - VIRTUAL_PORT=${PORT}
+      - LETSENCRYPT_HOST=${DOMAIN}
+      - LETSENCRYPT_EMAIL=${EMAIL}
     volumes:
       - /var/www/hono-bot-wa/.wwebjs_auth:/app/.wwebjs_auth
       - /var/www/hono-bot-wa/.wwebjs_cache:/app/.wwebjs_cache
