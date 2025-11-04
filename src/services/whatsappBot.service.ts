@@ -27,8 +27,8 @@ export class WhatsAppBotService {
     this.commands.set("get-chat", async (message) => {
       const chats = await whatsappService.getChats();
       const chatList = chats
-        .filter((c) => c.id?.user)
-        .map((c) => generateWaLink(c.id.user))
+        .filter((c) => c.id)
+        .map((c) => generateWaLink(c.id))
         .slice(0, 10)
         .join("\n");
 
