@@ -1,4 +1,4 @@
-import { Message, List } from "whatsapp-web.js";
+import { Message, List, Buttons } from "whatsapp-web.js";
 import { whatsappService } from "./whatsapp.service"; // gunakan service yang sudah ada
 import { generateWaLink } from "@/helpers/generateWaLink";
 
@@ -33,27 +33,6 @@ export class WhatsAppBotService {
         .join("\n");
 
       await message.reply(`*Get Chat*\n${chatList}`);
-    });
-
-    this.commands.set("menu", async (message) => {
-      const list = new List(
-        "Pilih aksi di bawah ini 👇",
-        "Lihat Menu",
-        [
-          {
-            title: "SmartNet System",
-            rows: [
-              { id: "status_node", title: "📡 Status Node" },
-              { id: "stat_harian", title: "📊 Statistik Harian" },
-              { id: "chat_admin", title: "💬 Hubungi Admin" },
-            ],
-          },
-        ],
-        "SmartNet Bot",
-        "powered by LoRa 🌾"
-      );
-
-      await message.reply(list);
     });
 
     // contoh command !help
