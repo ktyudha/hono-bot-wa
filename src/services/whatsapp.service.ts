@@ -11,6 +11,7 @@ import { formatPhoneNumber } from "@/helpers/formatPhoneNumber";
 export class WhatsAppService {
   private client: Client;
   private isReady: boolean = false;
+  public botNumber: string | null = null;
 
   constructor() {
     this.client = new Client({
@@ -33,6 +34,10 @@ export class WhatsAppService {
     this.client.on("ready", () => {
       console.log("WhatsApp client is ready!");
       this.isReady = true;
+
+      const info = this.client.info;
+      this.botNumber = info.wid.user;
+      console.log(`WhatsApp ${this.botNumber}`);
     });
 
     this.client.on("authenticated", () => {

@@ -1,5 +1,6 @@
 import { Message } from "whatsapp-web.js";
 import { whatsappService } from "./whatsapp.service"; // gunakan service yang sudah ada
+import { generateWaLink } from "@/helpers/generateWaLink";
 
 export class WhatsAppBotService {
   private prefix: string = "!";
@@ -26,11 +27,12 @@ export class WhatsAppBotService {
     this.commands.set("get-chat", async (message) => {
       const chats = await whatsappService.getChats();
       const chatList = chats
-        .map((c) => `• ${c.name || c.id}`)
-        .slice(0, 10) // batas 10 biar tidak terlalu panjang
+        .filter((c) => c.id?.user)
+        .map((c) => generateWaLink(c.id.user))
+        .slice(0, 10)
         .join("\n");
 
-      await message.reply(`📋 Daftar Chat:\n${chatList}`);
+      await message.reply(`*Get Chat*\n${chatList}`);
     });
 
     // contoh command !help
@@ -39,7 +41,7 @@ export class WhatsAppBotService {
         .map((cmd) => `• !${cmd}`)
         .join("\n");
 
-      await message.reply(`🤖 Perintah tersedia:\n${helpText}`);
+      await message.reply(`WhatsApp Bot Command\n${helpText}`);
     });
   }
 
