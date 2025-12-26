@@ -43,6 +43,19 @@ export class WhatsAppBotService {
 
       await message.reply(`WhatsApp Bot Command\n${helpText}`);
     });
+
+    // !battery
+    this.commands.set("battery", async (message) => {
+      const { battery, plugged } = await whatsappService.getBatteryStatus();
+
+      const chargingText = plugged ? "Sedang di-charge" : "Tidak di-charge";
+
+      await message.reply(
+        `*Battery Status*\n` +
+          `Level : ${battery}%\n` +
+          `Status: ${chargingText}`
+      );
+    });
   }
 
   private listenIncomingMessages() {
@@ -60,13 +73,12 @@ export class WhatsAppBotService {
           await commandHandler(message, args);
         } catch (err) {
           console.error(`[BOT] Error on command ${cmd}:`, err);
-          await message.reply(
-            "⚠️ Terjadi kesalahan saat menjalankan perintah."
-          );
+
+          await message.reply("Terjadi kesalahan saat menjalankan perintah.");
         }
       } else {
         await message.reply(
-          "❓ Perintah tidak dikenal. Ketik *!help* untuk daftar perintah."
+          "Perintah tidak dikenal.\nKetik *!help* untuk daftar perintah."
         );
       }
     });

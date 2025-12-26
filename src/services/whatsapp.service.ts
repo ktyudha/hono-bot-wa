@@ -4,6 +4,9 @@ import {
   Message,
   MessageMedia,
   GroupChat,
+  Buttons,
+  List,
+  Location,
 } from "whatsapp-web.js";
 import * as qrcode from "qrcode-terminal";
 import { formatPhoneNumber } from "@/helpers/formatPhoneNumber";
@@ -243,6 +246,44 @@ export class WhatsAppService {
       isReady: this.isReady,
       isAuthenticated: this.client.info !== undefined,
     };
+  }
+
+  //  GENERAL
+  public async sendButtons(to: string) {
+    if (!this.isReady) throw new Error("WhatsApp client is not ready");
+
+    const chatId = await this.toWhatsAppId(to);
+
+    const buttons = new Buttons(
+      "Pilih menu",
+      [{ body: "Menu 1" }, { body: "Menu 2" }],
+      "Judul",
+      "Footer"
+    );
+    await this.client.sendMessage(chatId, buttons);
+  }
+
+  public async getBatteryStatus(): Promise<{
+    battery: number;
+    plugged: boolean;
+  }> {
+    if (!this.isReady) throw new Error("WhatsApp client is not ready");
+    const status = await this.client.info?.getBatteryStatus();
+
+    if (!status) throw new Error("Battery status not available");
+
+    return {
+      battery: status.battery,
+      plugged: status.plugged,
+    };
+  }
+
+  public async isRegistered(number: string): Promise<boolean> {
+    if (!this.isReady) throw new Error("WhatsApp client is not ready");
+
+    const chatId = await this.toWhatsAppId(number);
+
+    return this.client.isRegisteredUser(chatId);
   }
 
   public async logout(): Promise<void> {
