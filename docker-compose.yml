@@ -9,4 +9,5 @@ services:
     volumes:
       - /var/www/hono-bot-wa/.wwebjs_auth:/app/.wwebjs_auth
       - /var/www/hono-bot-wa/.wwebjs_cache:/app/.wwebjs_cache
-    command: bun run --hot src/index.ts
+    # command: bun run --hot src/index.ts
+    command: npm run dev
