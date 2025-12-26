@@ -71,8 +71,23 @@ RUN apt-get update && apt-get install -y \
 
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
+# WORKDIR /app
+# COPY package*.json ./
+# RUN npm install
+# COPY . .
+# CMD ["npm", "run", "dev"]
+
+# Salin package.json dan bun.lockb untuk caching
+COPY package.json bun.lockb* ./
+
+# Install dependencies
+RUN bun install
+
+# Salin semua source code
 COPY . .
-CMD ["npm", "run", "dev"]
+
+# Volume untuk session WhatsApp
+VOLUME ["/app/data"]
+
+# Jalankan Hono dengan hot reload
+CMD ["bun", "run", "--hot", "src/index.ts"]
