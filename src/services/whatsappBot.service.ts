@@ -56,6 +56,14 @@ export class WhatsAppBotService {
           `Status: ${chargingText}`
       );
     });
+
+
+    // !location
+    this.commands.set("location", async (message) => {
+      const {latitude, longitude, address,name, description } = message.location;
+
+      await message.reply(`Location:\nLatitude:${latitude}\nLongitude:${longitude}\n\nAddress:${address}\nName:${name}\nDescription:${description}`);
+    });
   }
 
   private listenIncomingMessages() {
