@@ -19,7 +19,9 @@ whatsappRouter.get("/status", (c) => whatsappController.getStatus(c));
 whatsappRouter.post("/send-message", (c) => whatsappController.sendMessage(c));
 
 // Send media
-whatsappRouter.post("/send-media", (c) => whatsappController.sendMedia(c));
+whatsappRouter.post("/send-media-url", (c) =>
+  whatsappController.sendMediaWithUrl(c)
+);
 
 // Send message to group
 whatsappRouter.post("/send-message-group", (c) =>

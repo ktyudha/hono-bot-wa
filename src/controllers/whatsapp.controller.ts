@@ -51,6 +51,43 @@ export class WhatsAppController {
     }
   }
 
+  public async sendMediaGlobal(c: Context) {
+    try {
+      // const { to, caption } = await c.req.json();
+      // const { file } = await (c.req as any).file;
+
+      const req = c.req.raw as any;
+      const to = req.body?.to;
+      const caption = req.body?.caption;
+      const file = req.file;
+
+      if (!to || !file) {
+        return c.json(
+          {
+            success: false,
+            error: "Missing required fields: to and file media",
+          },
+          400
+        );
+      }
+
+      await whatsappService.sendMediaGlobal(to, file.path, caption);
+
+      return c.json({
+        success: true,
+        message: "Message sent successfully",
+      });
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: error.message || "Failed to send message",
+        },
+        500
+      );
+    }
+  }
+
   public async sendMessage(c: Context) {
     try {
       const { to, message } = await c.req.json();
@@ -82,7 +119,7 @@ export class WhatsAppController {
     }
   }
 
-  public async sendMedia(c: Context) {
+  public async sendMediaWithUrl(c: Context) {
     try {
       const { to, mediaUrl, caption } = await c.req.json();
 
@@ -96,7 +133,7 @@ export class WhatsAppController {
         );
       }
 
-      await whatsappService.sendMedia(to, mediaUrl, caption);
+      await whatsappService.sendMediaWithUrl(to, mediaUrl, caption);
 
       return c.json({
         success: true,

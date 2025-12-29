@@ -9,6 +9,7 @@ import {
   Location,
 } from "whatsapp-web.js";
 import * as qrcode from "qrcode-terminal";
+import fs from "fs";
 import { formatPhoneNumber } from "@/helpers/formatPhoneNumber";
 
 export class WhatsAppService {
@@ -92,6 +93,7 @@ export class WhatsAppService {
     }
   }
 
+  // GLOBAL
   public async sendMessageGlobal(to: string, message: string): Promise<void> {
     if (!this.isReady) {
       throw new Error("WhatsApp client: not ready");
@@ -108,6 +110,35 @@ export class WhatsAppService {
     }
   }
 
+  public async sendMediaGlobal(
+    to: string,
+    filePath: string,
+    caption?: string
+  ): Promise<void> {
+    if (!this.isReady) throw new Error("WhatsApp client: not ready");
+    this.validateWhatsAppId(to);
+
+    try {
+      const chatId = await this.toWhatsAppId(to);
+      const media = MessageMedia.fromFilePath(filePath);
+
+      await this.client.sendMessage(chatId, media, {
+        caption,
+      });
+
+      // remove temporary file
+      fs.unlink(filePath, (err) => {
+        if (err) console.error("Failed delete tmp file:", err);
+      });
+
+      console.log(`Media sent to: ${chatId}`);
+    } catch (error) {
+      console.error("Error sending media:", error);
+      throw error;
+    }
+  }
+
+  // CHATS
   public async sendMessage(to: string, message: string): Promise<void> {
     if (!this.isReady) {
       throw new Error("WhatsApp client: not ready");
@@ -123,7 +154,7 @@ export class WhatsAppService {
     }
   }
 
-  public async sendMedia(
+  public async sendMediaWithUrl(
     to: string,
     mediaUrl: string,
     caption?: string
@@ -193,6 +224,7 @@ export class WhatsAppService {
     }
   }
 
+  // GROUPS
   public async getGroups(): Promise<any[]> {
     if (!this.isReady) throw new Error("WhatsApp client is not ready");
 
