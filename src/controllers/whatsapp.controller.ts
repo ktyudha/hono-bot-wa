@@ -53,9 +53,6 @@ export class WhatsAppController {
 
   public async sendMediaGlobal(c: Context) {
     try {
-      // const { to, caption } = await c.req.json();
-      // const { file } = await (c.req as any).file;
-
       const req = c.req.raw as any;
       const to = req.body?.to;
       const caption = req.body?.caption;

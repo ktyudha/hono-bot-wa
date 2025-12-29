@@ -12,6 +12,11 @@ whatsappRouter.post("/send-message-global", (c) =>
   whatsappController.sendMessageGlobal(c)
 );
 
+// Send Media Global
+whatsappRouter.post("/send-media-global", (c) =>
+  whatsappController.sendMediaGlobal(c)
+);
+
 // Get WhatsApp status
 whatsappRouter.get("/status", (c) => whatsappController.getStatus(c));
 
