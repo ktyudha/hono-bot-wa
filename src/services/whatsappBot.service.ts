@@ -3,6 +3,8 @@ import { whatsappService } from "./whatsapp.service"; // gunakan service yang su
 import { generateWaLink } from "@/helpers/generateWaLink";
 
 export class WhatsAppBotService {
+  private client = (whatsappService as any).client;
+  private whatsappRedirectGroupId = process.env.WHATSAPP_REDIRECT_GROUP_ID;
   private prefix: string = "!";
   private commands: Map<
     string,
@@ -12,6 +14,9 @@ export class WhatsAppBotService {
   constructor() {
     // Register commands di constructor
     this.registerCommands();
+
+    // Listen all message and forwarded to group
+    this.listenIncomingToForwardedMessages();
 
     // Listen message dari WhatsAppService
     this.listenIncomingMessages();
@@ -57,18 +62,20 @@ export class WhatsAppBotService {
       );
     });
 
-
     // !location
     this.commands.set("location", async (message) => {
-      const {latitude, longitude, address,name, description } = message.location;
+      const { latitude, longitude, address, name, description } =
+        message.location;
 
-      await message.reply(`Location:\nLatitude:${latitude}\nLongitude:${longitude}\n\nAddress:${address}\nName:${name}\nDescription:${description}`);
+      await message.reply(
+        `Location:\nLatitude:${latitude}\nLongitude:${longitude}\n\nAddress:${address}\nName:${name}\nDescription:${description}`
+      );
     });
   }
 
   private listenIncomingMessages() {
     // kita intercept event dari whatsappService.client
-    (whatsappService as any).client.on("message", async (message: Message) => {
+    this.client.on("message", async (message: Message) => {
       const body = message.body.trim();
       if (!body.startsWith(this.prefix)) return;
 
@@ -88,6 +95,28 @@ export class WhatsAppBotService {
         await message.reply(
           "Perintah tidak dikenal.\nKetik *!help* untuk daftar perintah."
         );
+      }
+    });
+  }
+
+  private listenIncomingToForwardedMessages() {
+    this.client.on("message", async (message: Message) => {
+      if (!this.whatsappRedirectGroupId) {
+        console.error(
+          "[BOT] Redirect: WhatsApp redirect groupId is not valid!"
+        );
+        return;
+      }
+
+      if (message.from == this.whatsappRedirectGroupId) return;
+
+      // only redirect chats, not group
+      if (message.from.endsWith("@g.us")) return;
+
+      try {
+        await message.forward(this.whatsappRedirectGroupId);
+      } catch (err) {
+        console.error("[BOT] Redirect: Error - ", err);
       }
     });
   }
