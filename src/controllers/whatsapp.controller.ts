@@ -74,12 +74,21 @@ export class WhatsAppController {
       }
 
       // VALIDASI EXTENSION
-      const ext = path.extname(file.name).toLowerCase();
-      const allowedExt = [".pdf", ".jpg", ".jpeg", ".png", ".webp"];
+      // const ext = path.extname(file.name).toLowerCase();
+      // const allowedExt = [
+      //   ".pdf",
+      //   ".jpg",
+      //   ".jpeg",
+      //   ".png",
+      //   ".webp",
+      //   ".docx",
+      //   ".xlsx",
+      //   ".svg",
+      // ];
 
-      if (!allowedExt.includes(ext)) {
-        return c.json({ error: "Invalid file type" }, 400);
-      }
+      // if (!allowedExt.includes(ext)) {
+      //   return c.json({ error: "Invalid file type" }, 400);
+      // }
 
       // SIMPAN KE TMP
       const tmpDir = path.join(process.cwd(), "tmp");
@@ -95,9 +104,18 @@ export class WhatsAppController {
       // KIRIM KE WHATSAPP
       await whatsappService.sendMediaGlobal(to, filePath, caption);
 
-      return c.json({ success: true });
+      return c.json({
+        success: true,
+        message: "Message sent successfully",
+      });
     } catch (e: any) {
-      return c.json({ error: e.message }, 500);
+      return c.json(
+        {
+          success: false,
+          error: e.message || "Failed to send message",
+        },
+        500
+      );
     }
   }
 
