@@ -7,6 +7,7 @@
     "@hono/node-server": "^1.19.0",
     "dotenv": "^17.2.1",
     "hono": "^4.9.4",
+    "multer": "^2.0.2",
     "qrcode-terminal": "^0.12.0",
     "whatsapp-web.js": "^1.32.0",
     "zod": "^4.1.0"
@@ -14,6 +15,7 @@
   "devDependencies": {
     "@types/bun": "latest",
     "@types/dotenv": "^6.1.1",
+    "@types/multer": "^2.0.0",
     "@types/qrcode-terminal": "^0.12.2"
   }
 }

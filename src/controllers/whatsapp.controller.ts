@@ -1,6 +1,11 @@
 import { Context } from "hono";
+import path from "path";
+import fs from "fs";
+
 import { whatsappService } from "../services/whatsapp.service";
 
+// Temporary Directory
+const temporaryDirectory = path.join(process.cwd(), "tmp");
 export class WhatsAppController {
   public async getStatus(c: Context) {
     try {
@@ -53,35 +58,46 @@ export class WhatsAppController {
 
   public async sendMediaGlobal(c: Context) {
     try {
-      const req = c.req.raw as any;
-      const to = req.body?.to;
-      const caption = req.body?.caption;
-      const file = req.file;
+      const body = await c.req.parseBody();
+
+      const to = body["to"] as string;
+      const caption = body["caption"] as string | undefined;
+      const file = body["file"] as File;
 
       if (!to || !file) {
-        return c.json(
-          {
-            success: false,
-            error: "Missing required fields: to and file media",
-          },
-          400
-        );
+        return c.json({ error: "to & file required" }, 400);
       }
 
-      await whatsappService.sendMediaGlobal(to, file.path, caption);
+      // VALIDASI SIZE
+      if (file.size > 64 * 1024 * 1024) {
+        return c.json({ error: "File too large (max 64MB)" }, 400);
+      }
 
-      return c.json({
-        success: true,
-        message: "Message sent successfully",
-      });
-    } catch (error: any) {
-      return c.json(
-        {
-          success: false,
-          error: error.message || "Failed to send message",
-        },
-        500
-      );
+      // VALIDASI EXTENSION
+      const ext = path.extname(file.name).toLowerCase();
+      const allowedExt = [".pdf", ".jpg", ".jpeg", ".png", ".webp"];
+
+      if (!allowedExt.includes(ext)) {
+        return c.json({ error: "Invalid file type" }, 400);
+      }
+
+      // SIMPAN KE TMP
+      const tmpDir = path.join(process.cwd(), "tmp");
+      if (!fs.existsSync(tmpDir)) {
+        fs.mkdirSync(tmpDir, { recursive: true });
+      }
+
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const filePath = path.join(tmpDir, `${Date.now()}-${file.name}`);
+
+      fs.writeFileSync(filePath, buffer);
+
+      // KIRIM KE WHATSAPP
+      await whatsappService.sendMediaGlobal(to, filePath, caption);
+
+      return c.json({ success: true });
+    } catch (e: any) {
+      return c.json({ error: e.message }, 500);
     }
   }
 
