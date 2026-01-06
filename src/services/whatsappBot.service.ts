@@ -1,4 +1,4 @@
-import { Message, List, Buttons } from "whatsapp-web.js";
+import { Message, List, Buttons, MessageTypes } from "whatsapp-web.js";
 import { whatsappService } from "./whatsapp.service"; // gunakan service yang sudah ada
 import { generateWaLink } from "@/helpers/generateWaLink";
 import { compressImage, compressVideo } from "@/helpers/media";
@@ -12,6 +12,13 @@ export class WhatsAppBotService {
     string,
     (message: Message, args: string[]) => Promise<void>
   > = new Map();
+  private liveLocationMap = new Map<
+    string,
+    {
+      lastUpdate: number;
+      groupMessageId: string;
+    }
+  >();
 
   private maxSizeVideo = 16; //Mb
 
@@ -71,11 +78,39 @@ export class WhatsAppBotService {
 
     // !location
     this.commands.set("location", async (message) => {
-      const { latitude, longitude, address, name, description } =
-        message.location;
+      let location = message.location;
+
+      // kalau reply lokasi
+      if (!location && message.hasQuotedMsg) {
+        const quoted = await message.getQuotedMessage();
+        location = quoted.location;
+      }
+
+      if (!location) {
+        await message.reply(
+          "Kirim lokasi atau *reply pesan lokasi* lalu ketik `!location`."
+        );
+        return;
+      }
+      const {
+        latitude,
+        longitude,
+        address,
+        name,
+        description,
+        accuracy,
+        speed,
+        degrees,
+      } = location as any;
 
       await message.reply(
-        `Location:\nLatitude:${latitude}\nLongitude:${longitude}\n\nAddress:${address}\nName:${name}\nDescription:${description}`
+        `*Location Received*\n\n` +
+          `Lat: ${latitude}\n` +
+          `Lng: ${longitude}\n` +
+          (accuracy ? `Accuracy: ${accuracy} m\n` : "") +
+          (speed ? `Speed: ${speed}\n` : "") +
+          (degrees ? `Direction: ${degrees}\n` : "") +
+          (address ? `\nAddress: ${address}` : "")
       );
     });
   }
@@ -125,6 +160,57 @@ export class WhatsAppBotService {
         const senderLabel = senderId.endsWith("@lid")
           ? senderId
           : senderId.replace(/\D/g, "");
+
+        // location
+        const type = message.type as string;
+        if (type === MessageTypes.LOCATION || type === "live_location") {
+          const loc = message.location;
+          if (!loc) return;
+
+          const isLive = type === "live_location";
+          const now = Date.now();
+
+          const mapsUrl = `https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`;
+
+          const text =
+            `*${isLive ? "LIVE LOCATION" : "LOCATION"}*\n\n` +
+            `*Dari*:\n${senderLabel}\n\n` +
+            `Lat: ${loc.latitude}\n` +
+            `Lng: ${loc.longitude}\n` +
+            (loc.accuracy ? `Accuracy: ${loc.accuracy} m\n` : "") +
+            (loc.address ? `Address: ${loc.address}\n` : "") +
+            `\n${mapsUrl}`;
+
+          const existing = this.liveLocationMap.get(senderId);
+
+          // live location
+          if (isLive && existing) {
+            await this.client.sendMessage(
+              this.whatsappRedirectGroupId,
+              `*Update Lokasi*\n\n${text}`
+            );
+
+            existing.lastUpdate = now;
+            return;
+          }
+
+          // location
+          const sentMessage = await this.client.sendMessage(
+            this.whatsappRedirectGroupId,
+            text
+          );
+
+          this.replyMap.set(sentMessage.id._serialized, senderId);
+
+          if (isLive) {
+            this.liveLocationMap.set(senderId, {
+              lastUpdate: now,
+              groupMessageId: sentMessage.id._serialized,
+            });
+          }
+
+          return;
+        }
 
         // message
         if (!message.hasMedia) {
@@ -186,7 +272,7 @@ export class WhatsAppBotService {
 
         const sentMessage = await this.client.sendMessage(
           this.whatsappRedirectGroupId,
-          media,
+          sendMedia,
           { caption, sendMediaAsDocument: message.type === "video" }
         );
 
