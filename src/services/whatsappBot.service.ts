@@ -114,7 +114,43 @@ export class WhatsAppBotService {
       if (message.from.endsWith("@g.us")) return;
 
       try {
-        await message.forward(this.whatsappRedirectGroupId);
+        const contact = await message.getContact();
+        const number = contact.number || message.from.replace("@c.us", "");
+        const name = contact.pushname || contact.name || "-";
+
+        // message
+        if (!message.hasMedia) {
+          const textMessage =
+            `*Pesan Masuk*\n\n` +
+            `*Dari*:\n${name} (${number})\n\n` +
+            `*Pesan*:\n${message.body || "-"}`;
+
+          await this.client.sendMessage(
+            this.whatsappRedirectGroupId,
+            textMessage
+          );
+          return;
+        }
+
+        // message media
+        const media = await message.downloadMedia();
+
+        if (!media) {
+          console.error("[BOT] Media download failed");
+          return;
+        }
+
+        const caption =
+          `*Pesan Media*\n\n` +
+          `*Dari*:\n${name} (${number})\n\n` +
+          `*Tipe*:\n${message.type.toUpperCase()}\n\n` +
+          (message.body ? `*Caption*:\n${message.body}` : "");
+
+        await this.client.sendMessage(this.whatsappRedirectGroupId, media, {
+          caption,
+        });
+
+        // await message.forward(this.whatsappRedirectGroupId);
       } catch (err) {
         console.error("[BOT] Redirect: Error - ", err);
       }
