@@ -114,15 +114,13 @@ export class WhatsAppBotService {
       if (message.from.endsWith("@g.us")) return;
 
       try {
-        const contact = await message.getContact();
-        const number = contact.number || message.from.replace("@c.us", "");
-        const name = contact.pushname || contact.name || "-";
+        const number = message.from.replace("@c.us", "");
 
         // message
         if (!message.hasMedia) {
           const textMessage =
             `*Pesan Masuk*\n\n` +
-            `*Dari*:\n${name} (${number})\n\n` +
+            `*Dari*:\n${number}\n\n` +
             `*Pesan*:\n${message.body || "-"}`;
 
           await this.client.sendMessage(
@@ -142,7 +140,7 @@ export class WhatsAppBotService {
 
         const caption =
           `*Pesan Media*\n\n` +
-          `*Dari*:\n${name} (${number})\n\n` +
+          `*Dari*:\n${number}\n\n` +
           `*Tipe*:\n${message.type.toUpperCase()}\n\n` +
           (message.body ? `*Caption*:\n${message.body}` : "");
 
