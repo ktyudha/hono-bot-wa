@@ -2,7 +2,7 @@ import { Message, List, Buttons, MessageTypes } from "whatsapp-web.js";
 import { whatsappService } from "./whatsapp.service"; // gunakan service yang sudah ada
 import { generateWaLink } from "@/helpers/generateWaLink";
 import { compressImage, compressVideo } from "@/helpers/media";
-import { safeString } from "@/helpers/general";
+import { safeBody, safeString } from "@/helpers/general";
 
 export class WhatsAppBotService {
   private client = (whatsappService as any).client;
@@ -119,7 +119,7 @@ export class WhatsAppBotService {
   private listenIncomingMessages() {
     // kita intercept event dari whatsappService.client
     this.client.on("message", async (message: Message) => {
-      const body = message.body.trim();
+      const body = safeBody(message.body, "");
       if (!body.startsWith(this.prefix)) return;
 
       const [cmd, ...args] = body.slice(1).split(" ");
@@ -162,63 +162,70 @@ export class WhatsAppBotService {
           ? senderId
           : senderId.replace(/\D/g, "");
 
+        if (!message.body && !message.hasMedia && !message.location) {
+          console.log("[BOT] Skip empty/system message");
+          return;
+        }
+
         // location
-        // const type = message.type as string;
-        // if (type === MessageTypes.LOCATION || type === "live_location") {
-        //   const loc = message.location;
-        //   if (!loc) return;
+        const type = message.type as string;
+        if (type === MessageTypes.LOCATION || type === "live_location") {
+          const loc = message.location;
+          if (!loc) return;
 
-        //   const isLive = type === "live_location";
-        //   const now = Date.now();
+          const isLive = type === "live_location";
+          const now = Date.now();
 
-        //   const mapsUrl = `https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`;
+          const mapsUrl = `https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`;
 
-        //   const text =
-        //     `*${isLive ? "LIVE LOCATION" : "LOCATION"}*\n\n` +
-        //     `*Dari*:\n${senderLabel}\n\n` +
-        //     `Lat: ${loc.latitude}\n` +
-        //     `Lng: ${loc.longitude}\n` +
-        //     (loc.accuracy ? `Accuracy: ${loc.accuracy} m\n` : "") +
-        //     (loc.address ? `Address: ${loc.address}\n` : "") +
-        //     `\n${mapsUrl}`;
+          const text =
+            `*${isLive ? "LIVE LOCATION" : "LOCATION"}*\n\n` +
+            `*Dari*:\n${senderLabel}\n\n` +
+            `Lat: ${loc.latitude}\n` +
+            `Lng: ${loc.longitude}\n` +
+            (loc.accuracy ? `Accuracy: ${loc.accuracy} m\n` : "") +
+            (loc.address ? `Address: ${loc.address}\n` : "") +
+            `\n${mapsUrl}`;
 
-        //   const existing = this.liveLocationMap.get(senderId);
+          const existing = this.liveLocationMap.get(senderId);
 
-        //   // live location
-        //   if (isLive && existing) {
-        //     await this.client.sendMessage(
-        //       this.whatsappRedirectGroupId,
-        //       `*Update Lokasi*\n\n${text}`
-        //     );
+          // live location
+          if (isLive && existing) {
+            await this.client.sendMessage(
+              this.whatsappRedirectGroupId,
+              `*Update Lokasi*\n\n${text}`
+            );
 
-        //     existing.lastUpdate = now;
-        //     return;
-        //   }
+            existing.lastUpdate = now;
+            return;
+          }
 
-        //   // location
-        //   const sentMessage = await this.client.sendMessage(
-        //     this.whatsappRedirectGroupId,
-        //     text
-        //   );
+          // location
+          const sentMessage = await this.client.sendMessage(
+            this.whatsappRedirectGroupId,
+            text
+          );
 
-        //   this.replyMap.set(sentMessage.id._serialized, senderId);
+          this.replyMap.set(sentMessage.id._serialized, senderId);
 
-        //   if (isLive) {
-        //     this.liveLocationMap.set(senderId, {
-        //       lastUpdate: now,
-        //       groupMessageId: sentMessage.id._serialized,
-        //     });
-        //   }
+          if (isLive) {
+            this.liveLocationMap.set(senderId, {
+              lastUpdate: now,
+              groupMessageId: sentMessage.id._serialized,
+            });
+          }
 
-        //   return;
-        // }
+          return;
+        }
 
         // message
         if (!message.hasMedia) {
+          const bodyText = safeBody(message.body);
+
           const textMessage =
             `*Pesan Masuk*\n\n` +
             `*Dari*:\n${senderLabel}\n\n` +
-            `*Pesan*:\n${message.body || "-"}`;
+            `*Pesan*:\n${bodyText}`;
 
           const sentMessage = await this.client.sendMessage(
             this.whatsappRedirectGroupId,
@@ -269,7 +276,7 @@ export class WhatsAppBotService {
           `*Pesan Media*\n\n` +
           `*Dari*:\n${senderLabel}\n\n` +
           `*Tipe*:\n${message.type.toUpperCase()}\n\n` +
-          (message.body ? `*Caption*:\n${message.body}` : "");
+          (message.body ? `*Caption*:\n${safeBody(message.body)}` : "");
 
         if (!sendMedia || !sendMedia.data || !sendMedia.mimetype) {
           console.warn("[BOT] Forward skipped: invalid media");
@@ -319,7 +326,7 @@ export class WhatsAppBotService {
           }
 
           const safeCaption = message.body
-            ? `*Balasan Admin*\n\n${message.body}`
+            ? `*Balasan Admin*\n\n${safeBody(message.body)}`
             : "*Balasan Admin*";
 
           await this.client.sendMessage(targetSender, media, {
@@ -332,7 +339,7 @@ export class WhatsAppBotService {
         // kirim balasan ke user asli
         await this.client.sendMessage(
           targetSender,
-          safeString(`*Balasan Admin*\n\n${message.body}`)
+          safeBody(`*Balasan Admin*\n\n${message.body}`)
         );
       } catch (err) {
         console.error("[BOT] Reply Error:", err);
