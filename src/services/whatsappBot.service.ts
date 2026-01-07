@@ -2,6 +2,7 @@ import { Message, List, Buttons, MessageTypes } from "whatsapp-web.js";
 import { whatsappService } from "./whatsapp.service"; // gunakan service yang sudah ada
 import { generateWaLink } from "@/helpers/generateWaLink";
 import { compressImage, compressVideo } from "@/helpers/media";
+import { safeString } from "@/helpers/general";
 
 export class WhatsAppBotService {
   private client = (whatsappService as any).client;
@@ -221,7 +222,7 @@ export class WhatsAppBotService {
 
           const sentMessage = await this.client.sendMessage(
             this.whatsappRedirectGroupId,
-            textMessage
+            safeString(textMessage)
           );
 
           // save map
@@ -275,13 +276,11 @@ export class WhatsAppBotService {
           return;
         }
 
-        const safeCaption = caption || "-";
-
         const sentMessage = await this.client.sendMessage(
           this.whatsappRedirectGroupId,
           sendMedia,
           {
-            caption: safeCaption,
+            caption: safeString(caption),
             sendMediaAsDocument: message.type === "video",
           }
         );
@@ -333,7 +332,7 @@ export class WhatsAppBotService {
         // kirim balasan ke user asli
         await this.client.sendMessage(
           targetSender,
-          `*Balasan Admin*\n\n${message.body || "-"}`
+          safeString(`*Balasan Admin*\n\n${message.body}`)
         );
       } catch (err) {
         console.error("[BOT] Reply Error:", err);
