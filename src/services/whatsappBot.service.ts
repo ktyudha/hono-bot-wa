@@ -232,8 +232,8 @@ export class WhatsAppBotService {
         // message media
         const media = await message.downloadMedia();
 
-        if (!media) {
-          console.error("[BOT] Media download failed");
+        if (!media || !media.data || !media.mimetype) {
+          console.warn("[BOT] Failed to download media for reply");
           return;
         }
 
@@ -270,14 +270,23 @@ export class WhatsAppBotService {
           `*Tipe*:\n${message.type.toUpperCase()}\n\n` +
           (message.body ? `*Caption*:\n${message.body}` : "");
 
+        if (!sendMedia || !sendMedia.data || !sendMedia.mimetype) {
+          console.warn("[BOT] Forward skipped: invalid media");
+          return;
+        }
+
+        const safeCaption = caption || "-";
+
         const sentMessage = await this.client.sendMessage(
           this.whatsappRedirectGroupId,
           sendMedia,
-          { caption, sendMediaAsDocument: message.type === "video" }
+          {
+            caption: safeCaption,
+            sendMediaAsDocument: message.type === "video",
+          }
         );
 
         this.replyMap.set(sentMessage.id._serialized, senderId);
-        // await message.forward(this.whatsappRedirectGroupId);
       } catch (err) {
         console.error("[BOT] Redirect: Error - ", err);
       }
@@ -305,15 +314,17 @@ export class WhatsAppBotService {
         // media
         if (message.hasMedia) {
           const media = await message.downloadMedia();
-          if (!media) {
-            console.warn("[BOT] Failed to download media");
+          if (!media || !media.data || !media.mimetype) {
+            console.warn("[BOT] Failed to download media for reply");
             return;
           }
 
+          const safeCaption = message.body
+            ? `*Balasan Admin*\n\n${message.body}`
+            : "*Balasan Admin*";
+
           await this.client.sendMessage(targetSender, media, {
-            caption: message.body
-              ? `*Balasan Admin*\n\n${message.body}`
-              : "*Balasan Admin*",
+            caption: safeCaption,
           });
 
           return;
