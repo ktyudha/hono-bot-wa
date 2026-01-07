@@ -163,55 +163,55 @@ export class WhatsAppBotService {
           : senderId.replace(/\D/g, "");
 
         // location
-        const type = message.type as string;
-        if (type === MessageTypes.LOCATION || type === "live_location") {
-          const loc = message.location;
-          if (!loc) return;
+        // const type = message.type as string;
+        // if (type === MessageTypes.LOCATION || type === "live_location") {
+        //   const loc = message.location;
+        //   if (!loc) return;
 
-          const isLive = type === "live_location";
-          const now = Date.now();
+        //   const isLive = type === "live_location";
+        //   const now = Date.now();
 
-          const mapsUrl = `https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`;
+        //   const mapsUrl = `https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`;
 
-          const text =
-            `*${isLive ? "LIVE LOCATION" : "LOCATION"}*\n\n` +
-            `*Dari*:\n${senderLabel}\n\n` +
-            `Lat: ${loc.latitude}\n` +
-            `Lng: ${loc.longitude}\n` +
-            (loc.accuracy ? `Accuracy: ${loc.accuracy} m\n` : "") +
-            (loc.address ? `Address: ${loc.address}\n` : "") +
-            `\n${mapsUrl}`;
+        //   const text =
+        //     `*${isLive ? "LIVE LOCATION" : "LOCATION"}*\n\n` +
+        //     `*Dari*:\n${senderLabel}\n\n` +
+        //     `Lat: ${loc.latitude}\n` +
+        //     `Lng: ${loc.longitude}\n` +
+        //     (loc.accuracy ? `Accuracy: ${loc.accuracy} m\n` : "") +
+        //     (loc.address ? `Address: ${loc.address}\n` : "") +
+        //     `\n${mapsUrl}`;
 
-          const existing = this.liveLocationMap.get(senderId);
+        //   const existing = this.liveLocationMap.get(senderId);
 
-          // live location
-          if (isLive && existing) {
-            await this.client.sendMessage(
-              this.whatsappRedirectGroupId,
-              `*Update Lokasi*\n\n${text}`
-            );
+        //   // live location
+        //   if (isLive && existing) {
+        //     await this.client.sendMessage(
+        //       this.whatsappRedirectGroupId,
+        //       `*Update Lokasi*\n\n${text}`
+        //     );
 
-            existing.lastUpdate = now;
-            return;
-          }
+        //     existing.lastUpdate = now;
+        //     return;
+        //   }
 
-          // location
-          const sentMessage = await this.client.sendMessage(
-            this.whatsappRedirectGroupId,
-            text
-          );
+        //   // location
+        //   const sentMessage = await this.client.sendMessage(
+        //     this.whatsappRedirectGroupId,
+        //     text
+        //   );
 
-          this.replyMap.set(sentMessage.id._serialized, senderId);
+        //   this.replyMap.set(sentMessage.id._serialized, senderId);
 
-          if (isLive) {
-            this.liveLocationMap.set(senderId, {
-              lastUpdate: now,
-              groupMessageId: sentMessage.id._serialized,
-            });
-          }
+        //   if (isLive) {
+        //     this.liveLocationMap.set(senderId, {
+        //       lastUpdate: now,
+        //       groupMessageId: sentMessage.id._serialized,
+        //     });
+        //   }
 
-          return;
-        }
+        //   return;
+        // }
 
         // message
         if (!message.hasMedia) {
