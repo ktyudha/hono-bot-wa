@@ -193,7 +193,7 @@ export class WhatsAppBotService {
           if (isLive && existing) {
             await this.client.sendMessage(
               this.whatsappRedirectGroupId,
-              `*Update Lokasi*\n\n${text}`
+              safeString(`*Update Lokasi*\n\n${text}`)
             );
 
             existing.lastUpdate = now;
@@ -203,7 +203,7 @@ export class WhatsAppBotService {
           // location
           const sentMessage = await this.client.sendMessage(
             this.whatsappRedirectGroupId,
-            text
+            safeString(text)
           );
 
           this.replyMap.set(sentMessage.id._serialized, senderId);
