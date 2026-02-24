@@ -144,8 +144,8 @@ export class WhatsAppBotService {
       if (!media?.data || !media?.mimetype) return;
 
       const caption = message.body
-        ? `*Balasan Admin*\n\n${safeBody(message.body)}`
-        : "*Balasan Admin*";
+        ? `*Balasan Admin* \n\n${safeBody(message.body)}`
+        : "*Balasan Admin* ";
 
       await whatsappService.sendMessage(targetSender, media, { caption });
       return;
@@ -153,7 +153,7 @@ export class WhatsAppBotService {
 
     await whatsappService.sendMessage(
       targetSender,
-      safeBody(`*Balasan Admin*\n\n${message.body}`),
+      safeBody(`*Balasan Admin* \n\n${message.body}`),
     );
   }
 
