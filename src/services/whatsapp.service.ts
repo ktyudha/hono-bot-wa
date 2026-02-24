@@ -155,7 +155,14 @@ export class WhatsAppService {
   public async sendMessageGlobal(to: string, message: string): Promise<void> {
     if (!this.isReady) throw new Error("WhatsApp client: not ready");
     this.validateWhatsAppId(to);
-    await this.client.sendMessage(to, message);
+
+    try {
+      await this.client.sendMessage(to, message);
+      console.log(`Message sent to: ${to}`);
+    } catch (error) {
+      console.error("Message sent error:", error);
+      throw error;
+    }
   }
 
   public async sendMediaGlobal(

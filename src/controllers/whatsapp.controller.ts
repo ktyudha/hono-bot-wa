@@ -143,7 +143,7 @@ export class WhatsAppController {
       return c.json(
         {
           success: false,
-          error: error.message || "Failed to send message",
+          error: error || "Failed to send message",
         },
         500
       );
