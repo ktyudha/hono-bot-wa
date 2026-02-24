@@ -132,13 +132,28 @@ export class WhatsAppService {
   /**
    * Kirim pesan — dipakai oleh BotService supaya tidak akses client langsung
    */
-  public async sendMessage(
-    to: string,
-    content: any,
-    options?: any,
-  ): Promise<any> {
-    if (!this.isReady) throw new Error("WhatsApp client: not ready");
-    return this.client.sendMessage(to, content, options);
+  // public async sendMessage(
+  //   to: string,
+  //   content: any,
+  //   options?: any,
+  // ): Promise<any> {
+  //   if (!this.isReady) throw new Error("WhatsApp client: not ready");
+  //   return this.client.sendMessage(to, content, options);
+  // }
+
+  public async sendMessage(to: string, message: string): Promise<void> {
+    if (!this.isReady) {
+      throw new Error("WhatsApp client: not ready");
+    }
+
+    try {
+      const chatId = await this.toWhatsAppId(to);
+      await this.client.sendMessage(chatId, message);
+      console.log(`Message sent to: ${chatId}`);
+    } catch (error) {
+      console.error("Message sent error:", error);
+      throw error;
+    }
   }
 
   public async initialize(): Promise<void> {
@@ -326,9 +341,14 @@ export class WhatsAppService {
   }
 
   private async toWhatsAppId(target: string, isGroup = false): Promise<string> {
-    if (target.endsWith("@c.us") || target.endsWith("@g.us")) return target;
-    if (!isGroup) return formatPhoneNumber(target) + "@c.us";
-    return target + "@g.us";
+    const extGroup = "@g.us";
+    const extChat = "@c.us";
+
+    if (target.endsWith(extChat) || target.endsWith(extGroup)) return target;
+    if (!isGroup) return formatPhoneNumber(target) + extChat;
+    if (isGroup) return target + extGroup;
+
+    return `${target}`;
   }
 
   private validateWhatsAppId(target: string) {
