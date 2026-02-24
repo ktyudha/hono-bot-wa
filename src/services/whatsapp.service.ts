@@ -4,33 +4,42 @@ import {
   Message,
   MessageMedia,
   GroupChat,
-  Buttons,
-  List,
-  Location,
 } from "whatsapp-web.js";
 import * as qrcode from "qrcode-terminal";
-import fs from "fs";
 import { formatPhoneNumber } from "@/helpers/formatPhoneNumber";
 
 export class WhatsAppService {
   private client: Client;
   private isReady: boolean = false;
+  private isInitializing: boolean = false; // FIX #1: guard double initialize
   public botNumber: string | null = null;
 
+  // FIX #2: dedup set untuk mencegah pesan diproses lebih dari sekali
+  private processedMessages: Set<string> = new Set();
+
   constructor() {
-    this.client = new Client({
+    this.client = this.createClient();
+    this.initializeEvents();
+  }
+
+  // FIX #3: pisahkan pembuatan client ke method sendiri
+  // supaya bisa dipakai ulang saat reconnect tanpa bikin class baru
+  private createClient(): Client {
+    return new Client({
       authStrategy: new LocalAuth(),
       puppeteer: {
         headless: true,
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
-          // "--disable-dev-shm-usage",
+          "--disable-dev-shm-usage",
+          "--disable-accelerated-2d-canvas",
+          "--no-first-run",
+          "--no-zygote",
+          "--disable-gpu",
         ],
       },
     });
-
-    this.initializeEvents();
   }
 
   private initializeEvents(): void {
@@ -42,6 +51,7 @@ export class WhatsAppService {
     this.client.on("ready", () => {
       console.log("WhatsApp client is ready!");
       this.isReady = true;
+      this.isInitializing = false;
 
       const info = this.client.info;
       this.botNumber = info.wid.user;
@@ -54,46 +64,99 @@ export class WhatsAppService {
 
     this.client.on("auth_failure", (msg: string) => {
       console.error("Authentication failed:", msg);
-    });
-
-    this.client.on("disconnected", (reason: string) => {
-      console.log("Client was logged out", reason);
       this.isReady = false;
+      this.isInitializing = false;
     });
 
-    // Handle incoming messages
+    // FIX #4: reconnect yang aman — buat client baru, bind ulang events
+    // sehingga tidak ada listener lama yang masih aktif
+    this.client.on("disconnected", async (reason: string) => {
+      console.log("Client was logged out:", reason);
+      this.isReady = false;
+
+      if (this.isInitializing) {
+        console.log("Already reinitializing, skip...");
+        return;
+      }
+
+      this.isInitializing = true;
+
+      try {
+        await this.client.destroy();
+      } catch (err) {
+        console.error("Error saat destroy client:", err);
+      }
+
+      // Buat client baru dan bind ulang semua events ke instance baru
+      // Ini penting! Jangan reuse client lama karena listener bisa numpuk
+      this.client = this.createClient();
+      this.initializeEvents();
+
+      try {
+        await this.client.initialize();
+      } catch (err) {
+        console.error("Gagal reinitialize client:", err);
+        this.isInitializing = false;
+      }
+    });
+
+    // FIX #5: bind message handler dengan dedup
     this.client.on("message", this.handleIncomingMessage.bind(this));
   }
 
   private async handleIncomingMessage(message: Message): Promise<void> {
+    // FIX #6: cek apakah pesan sudah pernah diproses
+    const msgId = message.id._serialized;
+    if (this.processedMessages.has(msgId)) {
+      console.log(`[SKIP] Pesan ${msgId} sudah diproses sebelumnya`);
+      return;
+    }
+    this.processedMessages.add(msgId);
+
+    // Bersihkan dari set setelah 60 detik supaya tidak memory leak
+    setTimeout(() => {
+      this.processedMessages.delete(msgId);
+    }, 60_000);
+
     try {
       console.log(`Received message from ${message.from}: ${message.body}`);
 
-      // Contoh handler sederhana
+      // FIX #7: gunakan else if supaya hanya 1 handler yang jalan per pesan
       if (message.body.toLowerCase() === "ping") {
         await message.reply("pong");
-      }
-
-      if (message.body.toLowerCase() === "info") {
+      } else if (message.body.toLowerCase() === "info") {
         const chat = await message.getChat();
         await message.reply(`Chat ID: ${chat.id._serialized}`);
       }
+      // tambahkan else if untuk command lainnya di sini
     } catch (error) {
       console.error("Error handling message:", error);
     }
   }
 
   public async initialize(): Promise<void> {
+    // FIX #8: guard supaya initialize() tidak bisa dipanggil dua kali
+    if (this.isInitializing) {
+      console.log("WhatsApp client: sedang dalam proses initialize, skip...");
+      return;
+    }
+    if (this.isReady) {
+      console.log("WhatsApp client: sudah ready, skip...");
+      return;
+    }
+
+    this.isInitializing = true;
+
     try {
       await this.client.initialize();
       console.log("WhatsApp client: initialized");
     } catch (error) {
       console.error("Failed to initialize WhatsApp client:", error);
+      this.isInitializing = false;
       throw error;
     }
   }
 
-  // GLOBAL
   public async sendMessageGlobal(to: string, message: string): Promise<void> {
     if (!this.isReady) {
       throw new Error("WhatsApp client: not ready");
@@ -110,35 +173,6 @@ export class WhatsAppService {
     }
   }
 
-  public async sendMediaGlobal(
-    to: string,
-    filePath: string,
-    caption?: string
-  ): Promise<void> {
-    if (!this.isReady) throw new Error("WhatsApp client: not ready");
-    this.validateWhatsAppId(to);
-
-    try {
-      const chatId = await this.toWhatsAppId(to);
-      const media = MessageMedia.fromFilePath(filePath);
-
-      await this.client.sendMessage(chatId, media, {
-        caption,
-      });
-
-      // remove temporary file
-      fs.unlink(filePath, (err) => {
-        if (err) console.error("Failed delete tmp file:", err);
-      });
-
-      console.log(`Media sent to: ${chatId}`);
-    } catch (error) {
-      console.error("Error sending media:", error);
-      throw error;
-    }
-  }
-
-  // CHATS
   public async sendMessage(to: string, message: string): Promise<void> {
     if (!this.isReady) {
       throw new Error("WhatsApp client: not ready");
@@ -154,7 +188,7 @@ export class WhatsAppService {
     }
   }
 
-  public async sendMediaWithUrl(
+  public async sendMedia(
     to: string,
     mediaUrl: string,
     caption?: string
@@ -224,7 +258,6 @@ export class WhatsAppService {
     }
   }
 
-  // GROUPS
   public async getGroups(): Promise<any[]> {
     if (!this.isReady) throw new Error("WhatsApp client is not ready");
 
@@ -234,7 +267,6 @@ export class WhatsAppService {
       .filter((chat) => chat.isGroup)
       .map((chat) => {
         const groupChat = chat as GroupChat;
-
         return {
           id: groupChat.id._serialized,
           name: groupChat.name,
@@ -284,44 +316,6 @@ export class WhatsAppService {
     };
   }
 
-  //  GENERAL
-  public async sendButtons(to: string) {
-    if (!this.isReady) throw new Error("WhatsApp client is not ready");
-
-    const chatId = await this.toWhatsAppId(to);
-
-    const buttons = new Buttons(
-      "Pilih menu",
-      [{ body: "Menu 1" }, { body: "Menu 2" }],
-      "Judul",
-      "Footer"
-    );
-    await this.client.sendMessage(chatId, buttons);
-  }
-
-  public async getBatteryStatus(): Promise<{
-    battery: number;
-    plugged: boolean;
-  }> {
-    if (!this.isReady) throw new Error("WhatsApp client is not ready");
-    const status = await this.client.info?.getBatteryStatus();
-
-    if (!status) throw new Error("Battery status not available");
-
-    return {
-      battery: status.battery,
-      plugged: status.plugged,
-    };
-  }
-
-  public async isRegistered(number: string): Promise<boolean> {
-    if (!this.isReady) throw new Error("WhatsApp client is not ready");
-
-    const chatId = await this.toWhatsAppId(number);
-
-    return this.client.isRegisteredUser(chatId);
-  }
-
   public async logout(): Promise<void> {
     try {
       await this.client.logout();
@@ -362,4 +356,8 @@ export class WhatsAppService {
   }
 }
 
+// Singleton — pastikan initialize() hanya dipanggil SEKALI di entry point (app.ts/server.ts)
+// Contoh di app.ts:
+//   import { whatsappService } from "./services/whatsappService";
+//   whatsappService.initialize();
 export const whatsappService = new WhatsAppService();
