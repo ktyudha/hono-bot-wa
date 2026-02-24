@@ -74,7 +74,9 @@ export class WhatsAppService {
       this.isInitializing = true;
       console.log("Client disconnected:", reason);
 
-      try { await this.client.destroy(); } catch (_) {}
+      try {
+        await this.client.destroy();
+      } catch (_) {}
 
       // Buat client baru — messageHandlers tetap tersimpan
       // WhatsAppBotService tidak perlu register ulang
@@ -118,13 +120,20 @@ export class WhatsAppService {
    * Dipanggil sekali saja — tidak perlu akses client langsung.
    */
   public onMessage(handler: (message: Message) => Promise<void>): void {
+    console.log(
+      `[WA] onMessage registered, total handlers: ${this.messageHandlers.length + 1}`,
+    );
     this.messageHandlers.push(handler);
   }
 
   /**
    * Kirim pesan — dipakai oleh BotService supaya tidak akses client langsung
    */
-  public async sendMessage(to: string, content: any, options?: any): Promise<any> {
+  public async sendMessage(
+    to: string,
+    content: any,
+    options?: any,
+  ): Promise<any> {
     if (!this.isReady) throw new Error("WhatsApp client: not ready");
     return this.client.sendMessage(to, content, options);
   }
@@ -146,14 +155,21 @@ export class WhatsAppService {
     await this.client.sendMessage(to, message);
   }
 
-  public async sendMedia(to: string, mediaUrl: string, caption?: string): Promise<void> {
+  public async sendMedia(
+    to: string,
+    mediaUrl: string,
+    caption?: string,
+  ): Promise<void> {
     if (!this.isReady) throw new Error("WhatsApp client is not ready");
     const chatId = await this.toWhatsAppId(to);
     const media = await MessageMedia.fromUrl(mediaUrl);
     await this.client.sendMessage(chatId, media, { caption });
   }
 
-  public async sendMessageToGroup(groupId: string, message: string): Promise<void> {
+  public async sendMessageToGroup(
+    groupId: string,
+    message: string,
+  ): Promise<void> {
     if (!this.isReady) throw new Error("WhatsApp client is not ready");
     const chatId = await this.toWhatsAppId(groupId, true);
     await this.client.sendMessage(chatId, message);
