@@ -11,10 +11,14 @@ import { formatPhoneNumber } from "@/helpers/formatPhoneNumber";
 export class WhatsAppService {
   private client: Client;
   private isReady: boolean = false;
-  private isInitializing: boolean = false; // FIX #1: guard double initialize
+  private isInitializing: boolean = false;
   public botNumber: string | null = null;
 
-  // FIX #2: dedup set untuk mencegah pesan diproses lebih dari sekali
+  // FIX: Simpan callback dari luar (WhatsAppBotService)
+  // Tidak perlu akses client langsung dari luar class ini
+  private messageHandlers: ((message: Message) => Promise<void>)[] = [];
+
+  // Dedup di satu tempat — bukan tersebar di tiap service
   private processedMessages: Set<string> = new Set();
 
   constructor() {
@@ -22,8 +26,6 @@ export class WhatsAppService {
     this.initializeEvents();
   }
 
-  // FIX #3: pisahkan pembuatan client ke method sendiri
-  // supaya bisa dipakai ulang saat reconnect tanpa bikin class baru
   private createClient(): Client {
     return new Client({
       authStrategy: new LocalAuth(),
@@ -52,9 +54,7 @@ export class WhatsAppService {
       console.log("WhatsApp client is ready!");
       this.isReady = true;
       this.isInitializing = false;
-
-      const info = this.client.info;
-      this.botNumber = info.wid.user;
+      this.botNumber = this.client.info.wid.user;
       console.log(`WhatsApp ${this.botNumber}`);
     });
 
@@ -68,201 +68,111 @@ export class WhatsAppService {
       this.isInitializing = false;
     });
 
-    // FIX #4: reconnect yang aman — buat client baru, bind ulang events
-    // sehingga tidak ada listener lama yang masih aktif
     this.client.on("disconnected", async (reason: string) => {
-      console.log("Client was logged out:", reason);
+      if (this.isInitializing) return;
       this.isReady = false;
-
-      if (this.isInitializing) {
-        console.log("Already reinitializing, skip...");
-        return;
-      }
-
       this.isInitializing = true;
+      console.log("Client disconnected:", reason);
 
-      try {
-        await this.client.destroy();
-      } catch (err) {
-        console.error("Error saat destroy client:", err);
-      }
+      try { await this.client.destroy(); } catch (_) {}
 
-      // Buat client baru dan bind ulang semua events ke instance baru
-      // Ini penting! Jangan reuse client lama karena listener bisa numpuk
+      // Buat client baru — messageHandlers tetap tersimpan
+      // WhatsAppBotService tidak perlu register ulang
       this.client = this.createClient();
       this.initializeEvents();
 
       try {
         await this.client.initialize();
       } catch (err) {
-        console.error("Gagal reinitialize client:", err);
+        console.error("Gagal reinitialize:", err);
         this.isInitializing = false;
       }
     });
 
-    // FIX #5: bind message handler dengan dedup
-    this.client.on("message", this.handleIncomingMessage.bind(this));
+    // SATU listener message — dedup di sini
+    this.client.on("message", async (message: Message) => {
+      const msgId = message.id._serialized;
+
+      if (this.processedMessages.has(msgId)) {
+        console.log(`[WA] Skip duplicate: ${msgId}`);
+        return;
+      }
+      this.processedMessages.add(msgId);
+      setTimeout(() => this.processedMessages.delete(msgId), 60_000);
+
+      // Dispatch ke semua handler yang terdaftar
+      for (const handler of this.messageHandlers) {
+        try {
+          await handler(message);
+        } catch (err) {
+          console.error("[WA] Message handler error:", err);
+        }
+      }
+    });
   }
 
-  private async handleIncomingMessage(message: Message): Promise<void> {
-    // FIX #6: cek apakah pesan sudah pernah diproses
-    const msgId = message.id._serialized;
-    if (this.processedMessages.has(msgId)) {
-      console.log(`[SKIP] Pesan ${msgId} sudah diproses sebelumnya`);
-      return;
-    }
-    this.processedMessages.add(msgId);
+  // ─── Public API ───────────────────────────────────────────────────────────
 
-    // Bersihkan dari set setelah 60 detik supaya tidak memory leak
-    setTimeout(() => {
-      this.processedMessages.delete(msgId);
-    }, 60_000);
+  /**
+   * Register message handler dari luar (WhatsAppBotService).
+   * Dipanggil sekali saja — tidak perlu akses client langsung.
+   */
+  public onMessage(handler: (message: Message) => Promise<void>): void {
+    this.messageHandlers.push(handler);
+  }
 
-    try {
-      console.log(`Received message from ${message.from}: ${message.body}`);
-
-      // FIX #7: gunakan else if supaya hanya 1 handler yang jalan per pesan
-      if (message.body.toLowerCase() === "ping") {
-        await message.reply("pong");
-      } else if (message.body.toLowerCase() === "info") {
-        const chat = await message.getChat();
-        await message.reply(`Chat ID: ${chat.id._serialized}`);
-      }
-      // tambahkan else if untuk command lainnya di sini
-    } catch (error) {
-      console.error("Error handling message:", error);
-    }
+  /**
+   * Kirim pesan — dipakai oleh BotService supaya tidak akses client langsung
+   */
+  public async sendMessage(to: string, content: any, options?: any): Promise<any> {
+    if (!this.isReady) throw new Error("WhatsApp client: not ready");
+    return this.client.sendMessage(to, content, options);
   }
 
   public async initialize(): Promise<void> {
-    // FIX #8: guard supaya initialize() tidak bisa dipanggil dua kali
-    if (this.isInitializing) {
-      console.log("WhatsApp client: sedang dalam proses initialize, skip...");
-      return;
-    }
-    if (this.isReady) {
-      console.log("WhatsApp client: sudah ready, skip...");
-      return;
-    }
-
+    if (this.isInitializing || this.isReady) return;
     this.isInitializing = true;
-
     try {
       await this.client.initialize();
-      console.log("WhatsApp client: initialized");
     } catch (error) {
-      console.error("Failed to initialize WhatsApp client:", error);
       this.isInitializing = false;
       throw error;
     }
   }
 
   public async sendMessageGlobal(to: string, message: string): Promise<void> {
-    if (!this.isReady) {
-      throw new Error("WhatsApp client: not ready");
-    }
-
+    if (!this.isReady) throw new Error("WhatsApp client: not ready");
     this.validateWhatsAppId(to);
-
-    try {
-      await this.client.sendMessage(to, message);
-      console.log(`Message sent to: ${to}`);
-    } catch (error) {
-      console.error("Message sent error:", error);
-      throw error;
-    }
+    await this.client.sendMessage(to, message);
   }
 
-  public async sendMessage(to: string, message: string): Promise<void> {
-    if (!this.isReady) {
-      throw new Error("WhatsApp client: not ready");
-    }
-
-    try {
-      const chatId = await this.toWhatsAppId(to);
-      await this.client.sendMessage(chatId, message);
-      console.log(`Message sent to: ${chatId}`);
-    } catch (error) {
-      console.error("Message sent error:", error);
-      throw error;
-    }
-  }
-
-  public async sendMedia(
-    to: string,
-    mediaUrl: string,
-    caption?: string
-  ): Promise<void> {
+  public async sendMedia(to: string, mediaUrl: string, caption?: string): Promise<void> {
     if (!this.isReady) throw new Error("WhatsApp client is not ready");
-
-    try {
-      const chatId = await this.toWhatsAppId(to);
-      const media = await MessageMedia.fromUrl(mediaUrl);
-
-      await this.client.sendMessage(chatId, media, { caption });
-      console.log(`Media sent to: ${chatId}`);
-    } catch (error) {
-      console.error("Error sending media:", error);
-      throw error;
-    }
+    const chatId = await this.toWhatsAppId(to);
+    const media = await MessageMedia.fromUrl(mediaUrl);
+    await this.client.sendMessage(chatId, media, { caption });
   }
 
-  public async sendMessageToGroup(
-    groupId: string,
-    message: string
-  ): Promise<void> {
+  public async sendMessageToGroup(groupId: string, message: string): Promise<void> {
     if (!this.isReady) throw new Error("WhatsApp client is not ready");
-
-    try {
-      const chatId = await this.toWhatsAppId(groupId, true);
-      await this.client.sendMessage(chatId, message);
-      console.log(`Message sent to group: ${groupId}`);
-    } catch (error) {
-      console.error("Error sending message to group:", error);
-      throw error;
-    }
-  }
-
-  public async sendMediaToGroup(
-    groupId: string,
-    mediaUrl: string,
-    caption?: string
-  ): Promise<void> {
-    if (!this.isReady) throw new Error("WhatsApp client is not ready");
-
-    try {
-      const chatId = await this.toWhatsAppId(groupId, true);
-      const media = await MessageMedia.fromUrl(mediaUrl);
-      await this.client.sendMessage(chatId, media, { caption });
-      console.log(`Media sent to group: ${groupId}`);
-    } catch (error) {
-      console.error("Error sending media to group:", error);
-      throw error;
-    }
+    const chatId = await this.toWhatsAppId(groupId, true);
+    await this.client.sendMessage(chatId, message);
   }
 
   public async getChats(): Promise<any[]> {
     if (!this.isReady) throw new Error("WhatsApp client is not ready");
-
-    try {
-      const chats = await this.client.getChats();
-      return chats.map((chat) => ({
-        id: chat.id._serialized,
-        name: chat.name,
-        isGroup: chat.isGroup,
-        timestamp: chat.timestamp,
-      }));
-    } catch (error) {
-      console.error("Error getting chats:", error);
-      throw error;
-    }
+    const chats = await this.client.getChats();
+    return chats.map((chat) => ({
+      id: chat.id._serialized,
+      name: chat.name,
+      isGroup: chat.isGroup,
+      timestamp: chat.timestamp,
+    }));
   }
 
   public async getGroups(): Promise<any[]> {
     if (!this.isReady) throw new Error("WhatsApp client is not ready");
-
     const chats = await this.client.getChats();
-
     return chats
       .filter((chat) => chat.isGroup)
       .map((chat) => {
@@ -275,30 +185,11 @@ export class WhatsAppService {
       });
   }
 
-  public async getGroupMessages(groupId: string, limit: number = 10) {
-    if (!this.isReady) throw new Error("WhatsApp client is not ready");
-
-    const chatId = await this.toWhatsAppId(groupId, true);
-    const chat = await this.client.getChatById(chatId);
-    const messages = await chat.fetchMessages({ limit });
-
-    return messages.map((msg) => ({
-      id: msg.id._serialized,
-      from: msg.from,
-      body: msg.body,
-      timestamp: msg.timestamp,
-      isFromMe: msg.fromMe,
-      type: msg.type,
-    }));
-  }
-
   public async getChatMessages(to: string, limit: number = 10) {
     if (!this.isReady) throw new Error("WhatsApp client is not ready");
-
     const chatId = await this.toWhatsAppId(to);
     const chat = await this.client.getChatById(chatId);
     const messages = await chat.fetchMessages({ limit });
-
     return messages.map((msg) => ({
       id: msg.id._serialized,
       from: msg.from,
@@ -317,36 +208,19 @@ export class WhatsAppService {
   }
 
   public async logout(): Promise<void> {
-    try {
-      await this.client.logout();
-      this.isReady = false;
-      console.log("Logged out successfully");
-    } catch (error) {
-      console.error("Error logging out:", error);
-      throw error;
-    }
+    await this.client.logout();
+    this.isReady = false;
   }
 
   public async destroy(): Promise<void> {
-    try {
-      await this.client.destroy();
-      this.isReady = false;
-      console.log("Client destroyed");
-    } catch (error) {
-      console.error("Error destroying client:", error);
-      throw error;
-    }
+    await this.client.destroy();
+    this.isReady = false;
   }
 
   private async toWhatsAppId(target: string, isGroup = false): Promise<string> {
-    const extGroup = "@g.us";
-    const extChat = "@c.us";
-
-    if (target.endsWith(extChat) || target.endsWith(extGroup)) return target;
-    if (!isGroup) return formatPhoneNumber(target) + extChat;
-    if (isGroup) return target + extGroup;
-
-    return `${target}`;
+    if (target.endsWith("@c.us") || target.endsWith("@g.us")) return target;
+    if (!isGroup) return formatPhoneNumber(target) + "@c.us";
+    return target + "@g.us";
   }
 
   private validateWhatsAppId(target: string) {
@@ -356,8 +230,4 @@ export class WhatsAppService {
   }
 }
 
-// Singleton — pastikan initialize() hanya dipanggil SEKALI di entry point (app.ts/server.ts)
-// Contoh di app.ts:
-//   import { whatsappService } from "./services/whatsappService";
-//   whatsappService.initialize();
 export const whatsappService = new WhatsAppService();

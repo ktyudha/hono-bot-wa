@@ -5,22 +5,13 @@ import { compressImage, compressVideo } from "@/helpers/media";
 import { safeBody, safeString } from "@/helpers/general";
 
 export class WhatsAppBotService {
-  private client = (whatsappService as any).client;
   private whatsappRedirectGroupId = process.env.WHATSAPP_REDIRECT_GROUP_ID;
   private prefix: string = "!";
-
-  // Map untuk menyimpan relasi pesan group → sender asli
   private replyMap = new Map<string, string>();
-
-  // Map untuk live location tracking
   private liveLocationMap = new Map<
     string,
     { lastUpdate: number; groupMessageId: string }
   >();
-
-  // Dedup: mencegah pesan diproses lebih dari sekali
-  private processedMessages = new Set<string>();
-
   private maxSizeVideo = 16; // MB
 
   private commands: Map<
@@ -31,32 +22,20 @@ export class WhatsAppBotService {
   constructor() {
     this.registerCommands();
 
-    // FIX: Hanya SATU listener, routing dilakukan di dalam
-    this.client.on("message", (message: Message) =>
-      this.handleMessage(message),
-    );
+    // FIX: Pakai onMessage() bukan akses client langsung
+    // Listener sudah ada di WhatsAppService — tidak akan numpuk saat reconnect
+    whatsappService.onMessage((message) => this.handleMessage(message));
+
+    console.log("[INIT] WhatsApp bot is now active");
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // SINGLE ENTRY POINT — semua pesan masuk lewat sini
+  // SINGLE ENTRY POINT
   // ─────────────────────────────────────────────────────────────────────────
   private async handleMessage(message: Message): Promise<void> {
     console.log(
-      `[BOT] Message masuk - from: ${message.from}, type: ${message.type}, body: ${message.body?.slice(0, 50)}`,
+      `[BOT] from: ${message.from} | type: ${message.type} | body: ${message.body?.slice(0, 50)}`,
     );
-    console.log(
-      `[BOT] isStatus: ${message.isStatus}, fromMe: ${message.fromMe}`,
-    );
-    console.log(`[BOT] groupId: ${this.whatsappRedirectGroupId}`);
-
-    // Dedup: skip jika sudah pernah diproses
-    const msgId = message.id._serialized;
-    if (this.processedMessages.has(msgId)) {
-      console.log(`[BOT] Skip duplicate message: ${msgId}`);
-      return;
-    }
-    this.processedMessages.add(msgId);
-    setTimeout(() => this.processedMessages.delete(msgId), 60_000);
 
     try {
       // 1. Reply dari group admin → teruskan ke user asli
@@ -65,7 +44,7 @@ export class WhatsAppBotService {
         return;
       }
 
-      // 2. Pesan command (diawali prefix "!")
+      // 2. Command (diawali prefix "!")
       const body = safeBody(message.body, "");
       if (body.startsWith(this.prefix)) {
         await this.handleCommand(message, body);
@@ -83,7 +62,7 @@ export class WhatsAppBotService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Handler 1: Command (!ping, !help, dst)
+  // Handler 1: Command
   // ─────────────────────────────────────────────────────────────────────────
   private async handleCommand(message: Message, body: string): Promise<void> {
     const [cmd, ...args] = body.slice(this.prefix.length).split(" ");
@@ -91,7 +70,7 @@ export class WhatsAppBotService {
 
     if (commandHandler) {
       try {
-        console.log(`[BOT] Executing command: ${cmd}`);
+        console.log(`[BOT] Command: ${cmd}`);
         await commandHandler(message, args);
       } catch (err) {
         console.error(`[BOT] Error on command ${cmd}:`, err);
@@ -109,7 +88,7 @@ export class WhatsAppBotService {
   // ─────────────────────────────────────────────────────────────────────────
   private async handleForwardToGroup(message: Message): Promise<void> {
     if (!this.whatsappRedirectGroupId) {
-      console.error("[BOT] Redirect: WhatsApp redirect groupId is not valid!");
+      console.error("[BOT] WHATSAPP_REDIRECT_GROUP_ID tidak ada di .env!");
       return;
     }
 
@@ -125,25 +104,22 @@ export class WhatsAppBotService {
 
     const type = message.type as string;
 
-    // Location / Live Location
     if (type === MessageTypes.LOCATION || type === "live_location") {
       await this.handleForwardLocation(message, senderId, senderLabel, type);
       return;
     }
 
-    // Media
     if (message.hasMedia) {
       await this.handleForwardMedia(message, senderId, senderLabel);
       return;
     }
 
-    // Text biasa
     const textMessage =
       `*Pesan Masuk*\n\n` +
       `*Dari*:\n${senderLabel}\n\n` +
       `*Pesan*:\n${safeBody(message.body)}`;
 
-    const sentMessage = await this.client.sendMessage(
+    const sentMessage = await whatsappService.sendMessage(
       this.whatsappRedirectGroupId,
       safeString(textMessage),
     );
@@ -152,45 +128,39 @@ export class WhatsAppBotService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Handler 3: Reply dari group admin → kirim balik ke user asli
+  // Handler 3: Reply dari group → kirim balik ke user
   // ─────────────────────────────────────────────────────────────────────────
   private async handleGroupReply(message: Message): Promise<void> {
     if (!message.hasQuotedMsg) return;
 
     const quoted = await message.getQuotedMessage();
-    const quotedId = quoted.id._serialized;
-    const targetSender = this.replyMap.get(quotedId);
+    const targetSender = this.replyMap.get(quoted.id._serialized);
 
     if (!targetSender) {
-      console.warn("[BOT] Reply target not found in replyMap");
+      console.warn("[BOT] Reply target tidak ditemukan di replyMap");
       return;
     }
 
     if (message.hasMedia) {
       const media = await message.downloadMedia();
-      if (!media?.data || !media?.mimetype) {
-        console.warn("[BOT] Failed to download media for reply");
-        return;
-      }
+      if (!media?.data || !media?.mimetype) return;
 
-      const safeCaption = message.body
+      const caption = message.body
         ? `*Balasan Admin*\n\n${safeBody(message.body)}`
         : "*Balasan Admin*";
 
-      await this.client.sendMessage(targetSender, media, {
-        caption: safeCaption,
-      });
+      await whatsappService.sendMessage(targetSender, media, { caption });
       return;
     }
 
-    await this.client.sendMessage(
+    await whatsappService.sendMessage(
       targetSender,
       safeBody(`*Balasan Admin*\n\n${message.body}`),
     );
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Sub-handler: Forward location ke group
+  // Sub-handler: Forward location
   // ─────────────────────────────────────────────────────────────────────────
   private async handleForwardLocation(
     message: Message,
@@ -208,28 +178,25 @@ export class WhatsAppBotService {
     const text =
       `*${isLive ? "LIVE LOCATION" : "LOCATION"}*\n\n` +
       `*Dari*:\n${senderLabel}\n\n` +
-      `Lat: ${loc.latitude}\n` +
-      `Lng: ${loc.longitude}\n` +
+      `Lat: ${loc.latitude}\nLng: ${loc.longitude}\n` +
       ((loc as any).accuracy ? `Accuracy: ${(loc as any).accuracy} m\n` : "") +
       ((loc as any).address ? `Address: ${(loc as any).address}\n` : "") +
       `\n${mapsUrl}`;
 
     const existing = this.liveLocationMap.get(senderId);
-
     if (isLive && existing) {
-      await this.client.sendMessage(
-        this.whatsappRedirectGroupId,
+      await whatsappService.sendMessage(
+        this.whatsappRedirectGroupId!,
         safeString(`*Update Lokasi*\n\n${text}`),
       );
       existing.lastUpdate = now;
       return;
     }
 
-    const sentMessage = await this.client.sendMessage(
-      this.whatsappRedirectGroupId,
+    const sentMessage = await whatsappService.sendMessage(
+      this.whatsappRedirectGroupId!,
       safeString(text),
     );
-
     this.replyMap.set(sentMessage.id._serialized, senderId);
 
     if (isLive) {
@@ -241,7 +208,7 @@ export class WhatsAppBotService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Sub-handler: Forward media ke group
+  // Sub-handler: Forward media
   // ─────────────────────────────────────────────────────────────────────────
   private async handleForwardMedia(
     message: Message,
@@ -249,11 +216,7 @@ export class WhatsAppBotService {
     senderLabel: string,
   ): Promise<void> {
     const media = await message.downloadMedia();
-
-    if (!media?.data || !media?.mimetype) {
-      console.warn("[BOT] Failed to download media");
-      return;
-    }
+    if (!media?.data || !media?.mimetype) return;
 
     let sendMedia = media;
 
@@ -278,10 +241,7 @@ export class WhatsAppBotService {
       }
     }
 
-    if (!sendMedia?.data || !sendMedia?.mimetype) {
-      console.warn("[BOT] Forward skipped: invalid media");
-      return;
-    }
+    if (!sendMedia?.data || !sendMedia?.mimetype) return;
 
     const caption =
       `*Pesan Media*\n\n` +
@@ -289,8 +249,8 @@ export class WhatsAppBotService {
       `*Tipe*:\n${message.type.toUpperCase()}\n\n` +
       (message.body ? `*Caption*:\n${safeBody(message.body)}` : "");
 
-    const sentMessage = await this.client.sendMessage(
-      this.whatsappRedirectGroupId,
+    const sentMessage = await whatsappService.sendMessage(
+      this.whatsappRedirectGroupId!,
       sendMedia,
       {
         caption: safeString(caption),
@@ -343,11 +303,9 @@ export class WhatsAppBotService {
 
       const { latitude, longitude, accuracy, speed, degrees, address } =
         location as any;
-
       await message.reply(
         `*Location Received*\n\n` +
-          `Lat: ${latitude}\n` +
-          `Lng: ${longitude}\n` +
+          `Lat: ${latitude}\nLng: ${longitude}\n` +
           (accuracy ? `Accuracy: ${accuracy} m\n` : "") +
           (speed ? `Speed: ${speed}\n` : "") +
           (degrees ? `Direction: ${degrees}\n` : "") +
