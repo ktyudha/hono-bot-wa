@@ -133,7 +133,7 @@ export class WhatsAppController {
         );
       }
 
-      await whatsappService.sendMessage(to, message);
+      await whatsappService.sendMessageGlobal(to, message);
 
       return c.json({
         success: true,

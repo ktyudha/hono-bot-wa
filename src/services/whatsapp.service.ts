@@ -5,6 +5,7 @@ import {
   MessageMedia,
   GroupChat,
 } from "whatsapp-web.js";
+import fs from "fs";
 import * as qrcode from "qrcode-terminal";
 import { formatPhoneNumber } from "@/helpers/formatPhoneNumber";
 
@@ -78,7 +79,7 @@ export class WhatsAppService {
 
       try {
         await this.client.destroy();
-      } catch (_) {}
+      } catch (_) { }
 
       // Buat client baru — messageHandlers tetap tersimpan
       // WhatsAppBotService tidak perlu register ulang
@@ -157,6 +158,34 @@ export class WhatsAppService {
     await this.client.sendMessage(to, message);
   }
 
+  public async sendMediaGlobal(
+    to: string,
+    filePath: string,
+    caption?: string
+  ): Promise<void> {
+    if (!this.isReady) throw new Error("WhatsApp client: not ready");
+    this.validateWhatsAppId(to);
+
+    try {
+      const chatId = await this.toWhatsAppId(to);
+      const media = MessageMedia.fromFilePath(filePath);
+
+      await this.client.sendMessage(chatId, media, {
+        caption,
+      });
+
+      // remove temporary file
+      fs.unlink(filePath, (err) => {
+        if (err) console.error("Failed delete tmp file:", err);
+      });
+
+      console.log(`Media sent to: ${chatId}`);
+    } catch (error) {
+      console.error("Error sending media:", error);
+      throw error;
+    }
+  }
+
   public async sendMedia(
     to: string,
     mediaUrl: string,
@@ -166,6 +195,43 @@ export class WhatsAppService {
     const chatId = await this.toWhatsAppId(to);
     const media = await MessageMedia.fromUrl(mediaUrl);
     await this.client.sendMessage(chatId, media, { caption });
+  }
+
+  public async sendMediaWithUrl(
+    to: string,
+    mediaUrl: string,
+    caption?: string
+  ): Promise<void> {
+    if (!this.isReady) throw new Error("WhatsApp client is not ready");
+
+    try {
+      const chatId = await this.toWhatsAppId(to);
+      const media = await MessageMedia.fromUrl(mediaUrl);
+
+      await this.client.sendMessage(chatId, media, { caption });
+      console.log(`Media sent to: ${chatId}`);
+    } catch (error) {
+      console.error("Error sending media:", error);
+      throw error;
+    }
+  }
+
+  public async sendMediaToGroup(
+    groupId: string,
+    mediaUrl: string,
+    caption?: string
+  ): Promise<void> {
+    if (!this.isReady) throw new Error("WhatsApp client is not ready");
+
+    try {
+      const chatId = await this.toWhatsAppId(groupId, true);
+      const media = await MessageMedia.fromUrl(mediaUrl);
+      await this.client.sendMessage(chatId, media, { caption });
+      console.log(`Media sent to group: ${groupId}`);
+    } catch (error) {
+      console.error("Error sending media to group:", error);
+      throw error;
+    }
   }
 
   public async sendMessageToGroup(
@@ -208,6 +274,23 @@ export class WhatsAppService {
     const chatId = await this.toWhatsAppId(to);
     const chat = await this.client.getChatById(chatId);
     const messages = await chat.fetchMessages({ limit });
+    return messages.map((msg) => ({
+      id: msg.id._serialized,
+      from: msg.from,
+      body: msg.body,
+      timestamp: msg.timestamp,
+      isFromMe: msg.fromMe,
+      type: msg.type,
+    }));
+  }
+
+  public async getGroupMessages(groupId: string, limit: number = 10) {
+    if (!this.isReady) throw new Error("WhatsApp client is not ready");
+
+    const chatId = await this.toWhatsAppId(groupId, true);
+    const chat = await this.client.getChatById(chatId);
+    const messages = await chat.fetchMessages({ limit });
+
     return messages.map((msg) => ({
       id: msg.id._serialized,
       from: msg.from,
