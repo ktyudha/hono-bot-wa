@@ -39,6 +39,8 @@ export class WhatsAppService {
           "--no-first-run",
           "--no-zygote",
           "--disable-gpu",
+          "--disable-extensions",
+          "--single-process",
         ],
       },
     });
