@@ -25,8 +25,6 @@ export class WhatsAppBotService {
     // FIX: Pakai onMessage() bukan akses client langsung
     // Listener sudah ada di WhatsAppService — tidak akan numpuk saat reconnect
     whatsappService.onMessage((message) => this.handleMessage(message));
-
-    console.log("[INIT] WhatsApp bot is now active");
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -314,5 +312,3 @@ export class WhatsAppBotService {
     });
   }
 }
-
-export const whatsappBotService = new WhatsAppBotService();
