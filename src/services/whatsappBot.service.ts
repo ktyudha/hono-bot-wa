@@ -385,27 +385,43 @@ export class WhatsAppBotService {
     });
 
     this.commands.set("send", async (message, args) => {
-      // Usage: !send 6281234567890 Halo ini pesan dari bot
       if (args.length < 2) {
         await message.reply(
-          "*Usage:*\n`!send [nomor/groupId] [pesan]`\n\n" +
-          "*Contoh:*\n`!send 6281234567890 Halo!`\n" +
-          "`!send 1234567890@g.us Halo group!`"
+          "*Usage:*\n!send [nomor/groupId] [pesan]\n\n" +
+          "*Contoh:*\n!send 6281234567890 Halo!\n" +
+          "!send 1234567890@g.us Halo group!"
         );
         return;
       }
 
       const target = args[0];
       const text = args.slice(1).join(" ");
-
-      // Auto format ke @c.us kalau bukan group
       const to = target.endsWith("@g.us")
         ? target
         : `${target.replace(/\D/g, "")}@c.us`;
 
+      const contact = await message.getContact();
+      const senderName = contact.pushname || contact.name || contact.number || message.from;
+      const senderNumber = contact.number || contact.id.user || message.from;
+
       try {
         await whatsappService.sendMessage(to, text);
-        logger.send(`pesan terkirim ke ${target}`);
+        logger.send(`pesan terkirim dari ${senderName} ke ${target}`);
+
+        // Monitor ke group
+        if (this.whatsappRedirectGroupId) {
+          await whatsappService.sendMessage(
+            this.whatsappRedirectGroupId,
+            safeString(
+              `*Pesan Terkirim*\n\n` +
+              `*Dari*: ${senderName}\n` +
+              `*Nomor*: +${senderNumber}\n\n` +
+              `*Ke*: ${target}\n\n` +
+              `*Pesan*:\n${text}`
+            )
+          );
+        }
+
         await message.reply(`Pesan terkirim ke *${target}*`);
       } catch (err) {
         logger.error(`send error ke ${target}:`, err);
