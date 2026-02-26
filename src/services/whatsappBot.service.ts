@@ -230,6 +230,42 @@ export class WhatsAppBotService {
 
     let sendMedia = media;
 
+    if (message.type === "sticker") {
+      logger.media("forwarding sticker...");
+      const sentMessage = await whatsappService.sendMessage(
+        this.whatsappRedirectGroupId!,
+        media,
+        { sendMediaAsSticker: true }
+      );
+      logger.send(`sent! id: ${sentMessage.id._serialized}`);
+      this.replyMap.set(sentMessage.id._serialized, senderId);
+      return;
+    }
+
+    if (message.type === "audio" || message.type === "ptt") {
+      logger.media("forwarding audio...");
+      const sentMessage = await whatsappService.sendMessage(
+        this.whatsappRedirectGroupId!,
+        media,
+        { sendAudioAsVoice: message.type === "ptt" }
+      );
+      logger.send(`sent! id: ${sentMessage.id._serialized}`);
+      this.replyMap.set(sentMessage.id._serialized, senderId);
+      return;
+    }
+
+    if (message.type === "document") {
+      logger.media("forwarding document...");
+      const sentMessage = await whatsappService.sendMessage(
+        this.whatsappRedirectGroupId!,
+        media,
+        { sendMediaAsDocument: true }
+      );
+      logger.send(`sent! id: ${sentMessage.id._serialized}`);
+      this.replyMap.set(sentMessage.id._serialized, senderId);
+      return;
+    }
+
     if (message.type === "image") {
       logger.media("compressing image...");
       const compressed = await compressImage(media.data);
