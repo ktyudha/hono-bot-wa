@@ -420,7 +420,7 @@ export class WhatsAppBotService {
 
         // Monitor ke group
         if (this.whatsappRedirectGroupId) {
-          await whatsappService.sendMessage(
+          const monitorMessage = await whatsappService.sendMessage(
             this.whatsappRedirectGroupId,
             safeString(
               `*Pesan Terkirim*\n\n` +
@@ -430,6 +430,10 @@ export class WhatsAppBotService {
               `*Pesan*:\n${text}`
             )
           );
+
+          // Set default reply ke target (6281)
+          // Admin bisa override dengan "-> 6285 pesan" untuk reply ke pengirim
+          this.replyMap.set(monitorMessage.id._serialized, to);
         }
 
         await message.reply(`Pesan terkirim ke *${target}*`);
