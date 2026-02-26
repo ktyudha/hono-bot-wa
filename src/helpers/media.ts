@@ -41,5 +41,5 @@ export async function compressImage(base64: string) {
     .jpeg({ quality: 70 })
     .toBuffer();
 
-  return output.toString("base64");
+  return output.toString("base64").replace(/\s/g, "");
 }
