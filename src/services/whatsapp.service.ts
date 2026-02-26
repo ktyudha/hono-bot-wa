@@ -8,6 +8,7 @@ import {
 import fs from "fs";
 import * as qrcode from "qrcode-terminal";
 import { formatPhoneNumber } from "@/helpers/formatPhoneNumber";
+import { logger } from "@/helpers/logger";
 
 export class WhatsAppService {
   private client: Client;
@@ -49,24 +50,23 @@ export class WhatsAppService {
 
   private initializeEvents(): void {
     this.client.on("qr", (qr: string) => {
-      console.log("QR Code received, scan dengan WhatsApp Anda:");
+      logger.bot("QR Code received, scan dengan WhatsApp Anda:");
       qrcode.generate(qr, { small: true });
     });
 
     this.client.on("ready", () => {
-      console.log("WhatsApp client is ready!");
       this.isReady = true;
       this.isInitializing = false;
       this.botNumber = this.client.info.wid.user;
-      console.log(`WhatsApp ${this.botNumber}`);
+      logger.bot(`client ready, nomor: ${this.botNumber}`);
     });
 
     this.client.on("authenticated", () => {
-      console.log("Authenticated successfully");
+      logger.bot("authenticated successfully");
     });
 
     this.client.on("auth_failure", (msg: string) => {
-      console.error("Authentication failed:", msg);
+      logger.error(`authentication failed: ${msg}`);
       this.isReady = false;
       this.isInitializing = false;
     });
@@ -75,11 +75,11 @@ export class WhatsAppService {
       if (this.isInitializing) return;
       this.isReady = false;
       this.isInitializing = true;
-      console.log("Client disconnected:", reason);
+      logger.warn(`client disconnected: ${reason}`);
 
       try {
         await this.client.destroy();
-      } catch (_) {}
+      } catch (_) { }
 
       // Buat client baru — messageHandlers tetap tersimpan
       // WhatsAppBotService tidak perlu register ulang
@@ -89,7 +89,7 @@ export class WhatsAppService {
       try {
         await this.client.initialize();
       } catch (err) {
-        console.error("Gagal reinitialize:", err);
+        logger.error("gagal reinitialize:", err);
         this.isInitializing = false;
       }
     });
@@ -99,7 +99,7 @@ export class WhatsAppService {
       const msgId = message.id._serialized;
 
       if (this.processedMessages.has(msgId)) {
-        console.log(`[WA] Skip duplicate: ${msgId}`);
+        logger.bot(`skip duplicate: ${msgId}`);
         return;
       }
       this.processedMessages.add(msgId);
@@ -110,7 +110,7 @@ export class WhatsAppService {
         try {
           await handler(message);
         } catch (err) {
-          console.error("[WA] Message handler error:", err);
+          logger.error("message handler error:", err);
         }
       }
     });
@@ -123,9 +123,7 @@ export class WhatsAppService {
    * Dipanggil sekali saja — tidak perlu akses client langsung.
    */
   public onMessage(handler: (message: Message) => Promise<void>): void {
-    console.log(
-      `[WA] onMessage registered, total handlers: ${this.messageHandlers.length + 1}`,
-    );
+    logger.bot(`onMessage registered, total handlers: ${this.messageHandlers.length}`);
     this.messageHandlers.push(handler);
   }
 
@@ -149,9 +147,9 @@ export class WhatsAppService {
     try {
       const chatId = await this.toWhatsAppId(to);
       await this.client.sendMessage(chatId, message);
-      console.log(`Message sent to: ${chatId}`);
+      logger.send(`message sent to: ${chatId}`);
     } catch (error) {
-      console.error("Message sent error:", error);
+      logger.error("sendChatMessage error:", error);
       throw error;
     }
   }
@@ -173,9 +171,9 @@ export class WhatsAppService {
 
     try {
       await this.client.sendMessage(to, message);
-      console.log(`Message sent to: ${to}`);
+      logger.send(`message sent to: ${to}`);
     } catch (error) {
-      console.error("Message sent error:", error);
+      logger.error("sendMessageGlobal error:", error);
       throw error;
     }
   }
@@ -198,12 +196,12 @@ export class WhatsAppService {
 
       // remove temporary file
       fs.unlink(filePath, (err) => {
-        if (err) console.error("Failed delete tmp file:", err);
+        if (err) logger.error("failed delete tmp file:", err);
       });
 
-      console.log(`Media sent to: ${chatId}`);
+      logger.send(`media sent to: ${chatId}`);
     } catch (error) {
-      console.error("Error sending media:", error);
+      logger.error("sendMediaGlobal error:", error);
       throw error;
     }
   }
@@ -231,9 +229,9 @@ export class WhatsAppService {
       const media = await MessageMedia.fromUrl(mediaUrl);
 
       await this.client.sendMessage(chatId, media, { caption });
-      console.log(`Media sent to: ${chatId}`);
+      logger.send(`media sent to: ${chatId}`);
     } catch (error) {
-      console.error("Error sending media:", error);
+      logger.error("sendMediaWithUrl error:", error);
       throw error;
     }
   }
@@ -249,9 +247,9 @@ export class WhatsAppService {
       const chatId = await this.toWhatsAppId(groupId, true);
       const media = await MessageMedia.fromUrl(mediaUrl);
       await this.client.sendMessage(chatId, media, { caption });
-      console.log(`Media sent to group: ${groupId}`);
+      logger.send(`media sent to group: ${groupId}`);
     } catch (error) {
-      console.error("Error sending media to group:", error);
+      logger.error("sendMediaToGroup error:", error);
       throw error;
     }
   }
@@ -333,11 +331,13 @@ export class WhatsAppService {
   public async logout(): Promise<void> {
     await this.client.logout();
     this.isReady = false;
+    logger.bot("logged out");
   }
 
   public async destroy(): Promise<void> {
     await this.client.destroy();
     this.isReady = false;
+    logger.bot("destroyed");
   }
 
   private async toWhatsAppId(target: string, isGroup = false): Promise<string> {

@@ -1,9 +1,10 @@
 import { whatsappService } from "@/services/whatsapp.service";
 import { WhatsAppBotService } from "@/services/whatsappBot.service";
+import { logger } from "@/helpers/logger";
 
 export default async function whatsappInitialize() {
   await whatsappService.initialize();
 
   new WhatsAppBotService();
-  console.log("[INIT] WhatsApp bot is now active");
+  logger.bot("bot is now active");
 }

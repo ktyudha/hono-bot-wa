@@ -3,6 +3,7 @@ import { whatsappService } from "./whatsapp.service";
 import { generateWaLink } from "@/helpers/generateWaLink";
 import { compressImage, compressVideo } from "@/helpers/media";
 import { safeBody, safeString } from "@/helpers/general";
+import { logger } from "@/helpers/logger";
 
 export class WhatsAppBotService {
   private whatsappRedirectGroupId = process.env.WHATSAPP_REDIRECT_GROUP_ID;
@@ -31,9 +32,7 @@ export class WhatsAppBotService {
   // SINGLE ENTRY POINT
   // ─────────────────────────────────────────────────────────────────────────
   private async handleMessage(message: Message): Promise<void> {
-    console.log(
-      `[BOT] from: ${message.from} | type: ${message.type} | body: ${message.body?.slice(0, 50)}`,
-    );
+    logger.bot(`from: ${message.from} | type: ${message.type} | body: ${message.body?.slice(0, 50)}`);
 
     try {
       // 1. Reply dari group admin → teruskan ke user asli
@@ -55,7 +54,7 @@ export class WhatsAppBotService {
         return;
       }
     } catch (err) {
-      console.error("[BOT] handleMessage error:", err);
+      logger.error("handleMessage error:", err);
     }
   }
 
@@ -68,10 +67,10 @@ export class WhatsAppBotService {
 
     if (commandHandler) {
       try {
-        console.log(`[BOT] Command: ${cmd}`);
+        logger.cmd(`Command: ${cmd}`);
         await commandHandler(message, args);
       } catch (err) {
-        console.error(`[BOT] Error on command ${cmd}:`, err);
+        logger.error(`Error on command ${cmd}:`, err);
         await message.reply("Terjadi kesalahan saat menjalankan perintah.");
       }
     } else {
@@ -86,12 +85,12 @@ export class WhatsAppBotService {
   // ─────────────────────────────────────────────────────────────────────────
   private async handleForwardToGroup(message: Message): Promise<void> {
     if (!this.whatsappRedirectGroupId) {
-      console.error("[BOT] WHATSAPP_REDIRECT_GROUP_ID tidak ada di .env!");
+      logger.error("WHATSAPP_REDIRECT_GROUP_ID tidak ada di .env!");
       return;
     }
 
     if (!message.body && !message.hasMedia && !message.location) {
-      console.log("[BOT] Skip empty/system message");
+      logger.bot("Skip empty/system message");
       return;
     }
 
@@ -142,7 +141,7 @@ export class WhatsAppBotService {
     const targetSender = this.replyMap.get(quoted.id._serialized);
 
     if (!targetSender) {
-      console.warn("[BOT] Reply target tidak ditemukan di replyMap");
+      logger.warn("Reply target tidak ditemukan di replyMap");
       return;
     }
 
@@ -221,36 +220,32 @@ export class WhatsAppBotService {
     senderName: string,
     senderNumber: string,
   ): Promise<void> {
-    console.log("[BOT] handleForwardMedia start, type:", message.type);
+    logger.media(`start, type: ${message.type}`);
 
     const media = await message.downloadMedia();
-    console.log(
-      "[BOT] downloadMedia done, has data:",
-      !!media?.data,
-      "mimetype:",
-      media?.mimetype,
-    );
+    logger.media(`downloadMedia done, has data: ${!!media?.data}, mimetype: ${media?.mimetype}`);
+
 
     if (!media?.data || !media?.mimetype) return;
 
     let sendMedia = media;
 
     if (message.type === "image") {
-      console.log("[BOT] compressing image...");
+      logger.media("compressing image...");
       const compressed = await compressImage(media.data);
 
-      console.log("[BOT] compress image done, length:", compressed.length);
+      logger.media(`compress image done, length: ${compressed.length}`);
       sendMedia = new MessageMedia("image/jpeg", compressed, "image.jpg");
     }
 
     if (message.type === "video") {
-      console.log("[BOT] compressing video...");
+      logger.media("compressing video...");
       const sizeMB = Buffer.from(media.data, "base64").length / 1024 / 1024;
 
       if (sizeMB <= this.maxSizeVideo) {
         const compressed = await compressVideo(media.data);
-        console.log("[BOT] compress video done, length:", compressed.length);
 
+        logger.media(`compress video done, length: ${compressed.length}`);
         sendMedia = new MessageMedia("video/mp4", compressed, "video.mp4");
       }
     }
@@ -269,7 +264,7 @@ export class WhatsAppBotService {
       `*Tipe*: ${message.type.toUpperCase()}\n\n` +
       (bodyText ? `*Caption*:\n${safeBody(bodyText)}` : "");
 
-    console.log("[BOT] sending media to group...");
+    logger.send("sending media to group...");
     const sentMessage = await whatsappService.sendMessage(
       this.whatsappRedirectGroupId!,
       sendMedia,
@@ -279,7 +274,7 @@ export class WhatsAppBotService {
       },
     );
 
-    console.log("[BOT] sent! id:", sentMessage.id._serialized);
+    logger.send(`sent! id: ${sentMessage.id._serialized}`);
     this.replyMap.set(sentMessage.id._serialized, senderId);
   }
 
@@ -291,21 +286,65 @@ export class WhatsAppBotService {
       await message.reply("pong 🏓");
     });
 
-    this.commands.set("get-chat", async (message) => {
-      const chats = await whatsappService.getChats();
-      const chatList = chats
-        .filter((c) => c.id)
-        .map((c) => generateWaLink(c.id))
-        .slice(0, 10)
-        .join("\n");
-      await message.reply(`*Get Chat*\n${chatList}`);
-    });
-
     this.commands.set("help", async (message) => {
       const helpText = Array.from(this.commands.keys())
         .map((cmd) => `• !${cmd}`)
         .join("\n");
       await message.reply(`WhatsApp Bot Command\n${helpText}`);
+    });
+
+    this.commands.set("get-chat", async (message) => {
+      const chats = await whatsappService.getChats();
+
+      const chatLines = await Promise.all(
+        chats
+          .filter((c) => c.id)
+          .slice(0, 10)
+          .map(async (c) => {
+            const isGroup = c.id._serialized.endsWith("@g.us");
+
+            if (isGroup) {
+              return `*${c.name}*\nID: ${c.id._serialized}`;
+            }
+
+            const contact = await c.getContact();
+            const name = contact.pushname || contact.name || contact.number || c.id.user;
+            const number = contact.number || contact.id.user;
+            const link = generateWaLink(number);
+            return `*${name}* | +${number}\n${link}`;
+          })
+      );
+
+      await message.reply(`*Get Chat*\n\n${chatLines.join("\n\n")}`);
+    });
+
+    this.commands.set("send", async (message, args) => {
+      // Usage: !send 6281234567890 Halo ini pesan dari bot
+      if (args.length < 2) {
+        await message.reply(
+          "*Usage:*\n`!send [nomor/groupId] [pesan]`\n\n" +
+          "*Contoh:*\n`!send 6281234567890 Halo!`\n" +
+          "`!send 1234567890@g.us Halo group!`"
+        );
+        return;
+      }
+
+      const target = args[0];
+      const text = args.slice(1).join(" ");
+
+      // Auto format ke @c.us kalau bukan group
+      const to = target.endsWith("@g.us")
+        ? target
+        : `${target.replace(/\D/g, "")}@c.us`;
+
+      try {
+        await whatsappService.sendMessage(to, text);
+        logger.send(`pesan terkirim ke ${target}`);
+        await message.reply(`Pesan terkirim ke *${target}*`);
+      } catch (err) {
+        logger.error(`send error ke ${target}:`, err);
+        await message.reply(`Gagal kirim ke *${target}*`);
+      }
     });
 
     this.commands.set("location", async (message) => {
