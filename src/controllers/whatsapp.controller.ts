@@ -20,7 +20,7 @@ export class WhatsAppController {
           success: false,
           error: "Failed to get status",
         },
-        500
+        500,
       );
     }
   }
@@ -35,7 +35,7 @@ export class WhatsAppController {
             success: false,
             error: "Missing required fields: to and message",
           },
-          400
+          400,
         );
       }
 
@@ -51,7 +51,7 @@ export class WhatsAppController {
           success: false,
           error: error.message || "Failed to send message",
         },
-        500
+        500,
       );
     }
   }
@@ -114,7 +114,7 @@ export class WhatsAppController {
           success: false,
           error: e.message || "Failed to send message",
         },
-        500
+        500,
       );
     }
   }
@@ -129,11 +129,11 @@ export class WhatsAppController {
             success: false,
             error: "Missing required fields: to and message",
           },
-          400
+          400,
         );
       }
 
-      await whatsappService.sendMessage(to, message);
+      await whatsappService.sendChatMessage(to, message);
 
       return c.json({
         success: true,
@@ -145,7 +145,7 @@ export class WhatsAppController {
           success: false,
           error: error || "Failed to send message",
         },
-        500
+        500,
       );
     }
   }
@@ -160,7 +160,7 @@ export class WhatsAppController {
             success: false,
             error: "Missing required fields: to and mediaUrl",
           },
-          400
+          400,
         );
       }
 
@@ -176,7 +176,7 @@ export class WhatsAppController {
           success: false,
           error: error.message || "Failed to send media",
         },
-        500
+        500,
       );
     }
   }
@@ -195,7 +195,7 @@ export class WhatsAppController {
           success: false,
           error: error.message || "Failed to get chats",
         },
-        500
+        500,
       );
     }
   }
@@ -210,7 +210,7 @@ export class WhatsAppController {
             success: false,
             error: "Missing required fields: groupId and message",
           },
-          400
+          400,
         );
       }
 
@@ -226,7 +226,7 @@ export class WhatsAppController {
           success: false,
           error: error.message || "Failed to send message to group",
         },
-        500
+        500,
       );
     }
   }
@@ -241,7 +241,7 @@ export class WhatsAppController {
             success: false,
             error: "Missing required fields: groupId and mediaUrl",
           },
-          400
+          400,
         );
       }
 
@@ -257,7 +257,7 @@ export class WhatsAppController {
           success: false,
           error: error.message || "Failed to send media to group",
         },
-        500
+        500,
       );
     }
   }
@@ -276,7 +276,7 @@ export class WhatsAppController {
           success: false,
           error: error.message || "Failed to get groups",
         },
-        500
+        500,
       );
     }
   }
@@ -291,13 +291,13 @@ export class WhatsAppController {
             success: false,
             error: "Missing required field: groupId",
           },
-          400
+          400,
         );
       }
 
       const messages = await whatsappService.getGroupMessages(
         groupId,
-        Number(limit) || 10
+        Number(limit) || 10,
       );
 
       return c.json({
@@ -310,7 +310,7 @@ export class WhatsAppController {
           success: false,
           error: error.message || "Failed to get group messages",
         },
-        500
+        500,
       );
     }
   }
@@ -325,13 +325,13 @@ export class WhatsAppController {
             success: false,
             error: "Missing required field: to",
           },
-          400
+          400,
         );
       }
 
       const messages = await whatsappService.getChatMessages(
         to,
-        Number(limit) || 10
+        Number(limit) || 10,
       );
 
       return c.json({
@@ -344,7 +344,7 @@ export class WhatsAppController {
           success: false,
           error: error.message || "Failed to get chat messages",
         },
-        500
+        500,
       );
     }
   }
@@ -363,7 +363,7 @@ export class WhatsAppController {
           success: false,
           error: error.message || "Failed to logout",
         },
-        500
+        500,
       );
     }
   }
@@ -382,7 +382,7 @@ export class WhatsAppController {
           success: false,
           error: error.message || "Failed to destroy client",
         },
-        500
+        500,
       );
     }
   }

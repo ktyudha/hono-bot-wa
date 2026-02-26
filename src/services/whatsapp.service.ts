@@ -79,7 +79,7 @@ export class WhatsAppService {
 
       try {
         await this.client.destroy();
-      } catch (_) { }
+      } catch (_) {}
 
       // Buat client baru — messageHandlers tetap tersimpan
       // WhatsAppBotService tidak perlu register ulang
@@ -132,16 +132,16 @@ export class WhatsAppService {
   /**
    * Kirim pesan — dipakai oleh BotService supaya tidak akses client langsung
    */
-  // public async sendMessage(
-  //   to: string,
-  //   content: any,
-  //   options?: any,
-  // ): Promise<any> {
-  //   if (!this.isReady) throw new Error("WhatsApp client: not ready");
-  //   return this.client.sendMessage(to, content, options);
-  // }
+  public async sendMessage(
+    to: string,
+    content: any,
+    options?: any,
+  ): Promise<any> {
+    if (!this.isReady) throw new Error("WhatsApp client: not ready");
+    return this.client.sendMessage(to, content, options);
+  }
 
-  public async sendMessage(to: string, message: string): Promise<void> {
+  public async sendChatMessage(to: string, message: string): Promise<void> {
     if (!this.isReady) {
       throw new Error("WhatsApp client: not ready");
     }
@@ -183,7 +183,7 @@ export class WhatsAppService {
   public async sendMediaGlobal(
     to: string,
     filePath: string,
-    caption?: string
+    caption?: string,
   ): Promise<void> {
     if (!this.isReady) throw new Error("WhatsApp client: not ready");
     this.validateWhatsAppId(to);
@@ -222,7 +222,7 @@ export class WhatsAppService {
   public async sendMediaWithUrl(
     to: string,
     mediaUrl: string,
-    caption?: string
+    caption?: string,
   ): Promise<void> {
     if (!this.isReady) throw new Error("WhatsApp client is not ready");
 
@@ -241,7 +241,7 @@ export class WhatsAppService {
   public async sendMediaToGroup(
     groupId: string,
     mediaUrl: string,
-    caption?: string
+    caption?: string,
   ): Promise<void> {
     if (!this.isReady) throw new Error("WhatsApp client is not ready");
 
