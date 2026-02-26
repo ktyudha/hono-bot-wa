@@ -1,4 +1,4 @@
-import { Message, MessageTypes, MessageMedia } from "whatsapp-web.js";
+import { Message, MessageTypes, MessageMedia, Buttons, List } from "whatsapp-web.js";
 import { whatsappService } from "./whatsapp.service";
 import { generateWaLink } from "@/helpers/generateWaLink";
 import { compressImage, compressVideo } from "@/helpers/media";
@@ -318,12 +318,39 @@ export class WhatsAppBotService {
         location as any;
       await message.reply(
         `*Location Received*\n\n` +
-          `Lat: ${latitude}\nLng: ${longitude}\n` +
-          (accuracy ? `Accuracy: ${accuracy} m\n` : "") +
-          (speed ? `Speed: ${speed}\n` : "") +
-          (degrees ? `Direction: ${degrees}\n` : "") +
-          (address ? `\nAddress: ${address}` : ""),
+        `Lat: ${latitude}\nLng: ${longitude}\n` +
+        (accuracy ? `Accuracy: ${accuracy} m\n` : "") +
+        (speed ? `Speed: ${speed}\n` : "") +
+        (degrees ? `Direction: ${degrees}\n` : "") +
+        (address ? `\nAddress: ${address}` : ""),
       );
+    });
+
+
+    this.commands.set("menu", async (message) => {
+      try {
+        const button = new Buttons(
+          'Halo! Ada yang bisa dibantu?',
+          [
+            { body: '📦 Cek Status' },
+            { body: '💬 Hubungi CS' },
+            { body: '📋 Info Produk' },
+          ],
+          'Menu Utama',
+          'Pilih salah satu'
+        );
+        await whatsappService.sendMessage(message.from, button);
+      } catch (err) {
+        // Fallback ke teks kalau deprecated
+        console.error('[BOT] Buttons tidak support:', err);
+        await message.reply(
+          '*Menu Utama*\n\n' +
+          '1️⃣ Cek Status\n' +
+          '2️⃣ Hubungi CS\n' +
+          '3️⃣ Info Produk\n\n' +
+          '_Balas dengan angka_'
+        );
+      }
     });
   }
 }
