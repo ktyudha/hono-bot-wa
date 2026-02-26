@@ -326,31 +326,17 @@ export class WhatsAppBotService {
       );
     });
 
-
-    this.commands.set("menu", async (message) => {
-      try {
-        const button = new Buttons(
-          'Halo! Ada yang bisa dibantu?',
-          [
-            { body: '📦 Cek Status' },
-            { body: '💬 Hubungi CS' },
-            { body: '📋 Info Produk' },
-          ],
-          'Menu Utama',
-          'Pilih salah satu'
-        );
-        await whatsappService.sendMessage(message.from, button);
-      } catch (err) {
-        // Fallback ke teks kalau deprecated
-        console.error('[BOT] Buttons tidak support:', err);
-        await message.reply(
-          '*Menu Utama*\n\n' +
-          '1️⃣ Cek Status\n' +
-          '2️⃣ Hubungi CS\n' +
-          '3️⃣ Info Produk\n\n' +
-          '_Balas dengan angka_'
-        );
-      }
+    this.commands.set("whoami", async (message) => {
+      const contact = await message.getContact();
+      await message.reply(
+        `*Debug Info*\n\n` +
+        `from: ${message.from}\n` +
+        `number: ${contact.number}\n` +
+        `pushname: ${contact.pushname}\n` +
+        `name: ${contact.name}\n` +
+        `id.user: ${contact.id.user}\n` +
+        `id._serialized: ${contact.id._serialized}`
+      );
     });
   }
 }
