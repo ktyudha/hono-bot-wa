@@ -227,20 +227,6 @@ export class WhatsAppBotService {
 
     let sendMedia = media;
 
-    // if (message.type === "image") {
-    //   console.log("[BOT] skip compressing image...");
-    //   console.log("[BOT] compressing image...");
-    //   const compressed = await compressImage(media.data);
-
-    //   console.log("[BOT] compress image done, length:", compressed.length);
-    //   sendMedia = {
-    //     mimetype: "image/jpeg",
-    //     data: compressed,
-    //     // data: media.data.replace(/\s/g, ""),
-    //     filename: "image.jpg",
-    //   };
-    // }
-
     if (message.type === "image") {
       console.log("[BOT] compressing image...");
       const compressed = await compressImage(media.data);
@@ -260,22 +246,6 @@ export class WhatsAppBotService {
         sendMedia = new MessageMedia("video/mp4", compressed, "video.mp4");
       }
     }
-
-    // if (message.type === "video") {
-    //   console.log("[BOT] compressing video...");
-    //   const sizeMB = Buffer.from(media.data, "base64").length / 1024 / 1024;
-
-    //   if (sizeMB <= this.maxSizeVideo) {
-    //     const compressed = await compressVideo(media.data);
-    //     console.log("[BOT] compress video done, length:", compressed.length);
-
-    //     sendMedia = {
-    //       mimetype: "video/mp4",
-    //       data: compressed,
-    //       filename: "video.mp4",
-    //     };
-    //   }
-    // }
 
     if (!sendMedia?.data || !sendMedia?.mimetype) return;
 
