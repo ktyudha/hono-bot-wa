@@ -332,8 +332,45 @@ export class WhatsAppBotService {
     this.commands.set("get-chat", async (message) => {
       const chats = await whatsappService.getChats();
       logger.bot(`get-chat: total chats ${chats.length}`);
-      logger.bot(`get-chat: sample chat[0]: ${JSON.stringify(chats[0])}`);
-      await message.reply("cek log dulu");
+      logger.bot(`get-chat: sample ${JSON.stringify(chats[0]?.id)}`);
+
+      const filtered = chats
+        .filter((c) => c.id?._serialized)
+        .slice(0, 10);
+
+      logger.bot(`get-chat: filtered ${filtered.length} chats`);
+
+      const chatLines = await Promise.all(
+        filtered.map(async (c) => {
+          const isGroup = c.id._serialized.endsWith("@g.us");
+
+          if (isGroup) {
+            logger.bot(`get-chat: group ${c.name} | ${c.id._serialized}`);
+            return `*${c.name}*\nID: ${c.id._serialized}`;
+          }
+
+          try {
+            const contact = await Promise.race([
+              c.getContact(),
+              new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("timeout")), 3000)
+              ),
+            ]) as any;
+
+            const name = contact.pushname || contact.name || contact.number || c.id.user;
+            const number = contact.number || contact.id.user;
+            const link = generateWaLink(number);
+
+            logger.bot(`get-chat: personal ${name} | ${number}`);
+            return `*${name}* | +${number}\n${link}`;
+          } catch (err) {
+            logger.warn(`get-chat: gagal getContact ${c.id._serialized}: ${err}`);
+            return `*${c.id.user}*\nID: ${c.id._serialized}`;
+          }
+        })
+      );
+
+      await message.reply(`*Get Chat*\n\n${chatLines.join("\n\n")}`);
     });
 
     this.commands.set("send", async (message, args) => {
