@@ -265,13 +265,7 @@ export class WhatsAppService {
 
   public async getChats(): Promise<any[]> {
     if (!this.isReady) throw new Error("WhatsApp client is not ready");
-    const chats = await this.client.getChats();
-    return chats.map((chat) => ({
-      id: chat.id._serialized,
-      name: chat.name,
-      isGroup: chat.isGroup,
-      timestamp: chat.timestamp,
-    }));
+    return this.client.getChats();
   }
 
   public async getGroups(): Promise<any[]> {
