@@ -96,25 +96,32 @@ export class WhatsAppBotService {
     }
 
     const senderId = message.from;
-    const senderLabel = senderId.endsWith("@lid")
-      ? senderId
-      : senderId.replace(/\D/g, "");
+
+    // Fix senderLabel
+    const contact = await message.getContact();
+    const senderName = contact.pushname || contact.name || contact.number || senderId;
+    const senderNumber = contact.number || contact.id.user || senderId;
+
+    // const senderLabel = senderId.endsWith("@lid")
+    //   ? senderId
+    //   : senderId.replace(/\D/g, "");
 
     const type = message.type as string;
 
     if (type === MessageTypes.LOCATION || type === "live_location") {
-      await this.handleForwardLocation(message, senderId, senderLabel, type);
+      await this.handleForwardLocation(message, senderId, senderName, senderNumber, type);
       return;
     }
 
     if (message.hasMedia) {
-      await this.handleForwardMedia(message, senderId, senderLabel);
+      await this.handleForwardMedia(message, senderId, senderName, senderNumber);
       return;
     }
 
     const textMessage =
       `*Pesan Masuk*\n\n` +
-      `*Dari*:\n${senderLabel}\n\n` +
+      `*Dari*: ${senderName}\n` +
+      `*Nomor*: +${senderNumber}\n\n` +
       `*Pesan*:\n${safeBody(message.body)}`;
 
     const sentMessage = await whatsappService.sendMessage(
@@ -143,17 +150,15 @@ export class WhatsAppBotService {
       const media = await message.downloadMedia();
       if (!media?.data || !media?.mimetype) return;
 
-      const caption = message.body
-        ? `*Balasan Admin* \n\n${safeBody(message.body)}`
-        : "*Balasan Admin* ";
-
-      await whatsappService.sendMessage(targetSender, media, { caption });
+      await whatsappService.sendMessage(targetSender, media, {
+        caption: message.body ? safeBody(message.body) : undefined,
+      });
       return;
     }
 
     await whatsappService.sendMessage(
       targetSender,
-      safeBody(`*Balasan Admin* \n\n${message.body}`),
+      safeBody(message.body),
     );
   }
 
@@ -163,7 +168,8 @@ export class WhatsAppBotService {
   private async handleForwardLocation(
     message: Message,
     senderId: string,
-    senderLabel: string,
+    senderName: string,
+    senderNumber: string,
     type: string,
   ): Promise<void> {
     const loc = message.location;
@@ -175,7 +181,8 @@ export class WhatsAppBotService {
 
     const text =
       `*${isLive ? "LIVE LOCATION" : "LOCATION"}*\n\n` +
-      `*Dari*:\n${senderLabel}\n\n` +
+      `*Dari*: ${senderName}\n` +
+      `*Nomor*: +${senderNumber}\n\n` +
       `Lat: ${loc.latitude}\nLng: ${loc.longitude}\n` +
       ((loc as any).accuracy ? `Accuracy: ${(loc as any).accuracy} m\n` : "") +
       ((loc as any).address ? `Address: ${(loc as any).address}\n` : "") +
@@ -211,7 +218,8 @@ export class WhatsAppBotService {
   private async handleForwardMedia(
     message: Message,
     senderId: string,
-    senderLabel: string,
+    senderName: string,
+    senderNumber: string,
   ): Promise<void> {
     console.log("[BOT] handleForwardMedia start, type:", message.type);
 
@@ -256,8 +264,9 @@ export class WhatsAppBotService {
 
     const caption =
       `*Pesan Media*\n\n` +
-      `*Dari*:\n${senderLabel}\n\n` +
-      `*Tipe*:\n${message.type.toUpperCase()}\n\n` +
+      `*Dari*: ${senderName}\n` +
+      `*Nomor*: +${senderNumber}\n\n` +
+      `*Tipe*: ${message.type.toUpperCase()}\n\n` +
       (bodyText ? `*Caption*:\n${safeBody(bodyText)}` : "");
 
     console.log("[BOT] sending media to group...");
