@@ -136,24 +136,34 @@ export class WhatsAppBotService {
     const targetSender = this.replyMap.get(quoted.id._serialized);
 
     if (!targetSender) {
-      logger.warn("Reply target tidak ditemukan di replyMap");
+      logger.warn("reply target tidak ditemukan di replyMap");
       return;
     }
+
+    // Override target dengan format "-> 628xxx"
+    const overrideMatch = message.body?.match(/^->\s*(\d+)/);
+    let finalTarget = targetSender;
+
+    if (overrideMatch) {
+      const overrideNumber = overrideMatch[1].replace(/\D/g, "");
+      finalTarget = `${overrideNumber}@c.us`;
+      logger.bot(`reply override ke ${finalTarget}`);
+    }
+
+    // Hapus prefix "-> 628xxx" dari body sebelum dikirim
+    const body = message.body?.replace(/^->\s*\d+\s*/, "").trim();
 
     if (message.hasMedia) {
       const media = await message.downloadMedia();
       if (!media?.data || !media?.mimetype) return;
 
-      await whatsappService.sendMessage(targetSender, media, {
-        caption: message.body ? safeBody(message.body) : undefined,
+      await whatsappService.sendMessage(finalTarget, media, {
+        caption: body ? safeBody(body) : undefined,
       });
       return;
     }
 
-    await whatsappService.sendMessage(
-      targetSender,
-      safeBody(message.body),
-    );
+    await whatsappService.sendMessage(finalTarget, safeBody(body));
   }
 
   // ─────────────────────────────────────────────────────────────────────────
