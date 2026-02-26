@@ -213,13 +213,20 @@ export class WhatsAppBotService {
     senderId: string,
     senderLabel: string,
   ): Promise<void> {
+    console.log("[BOT] handleForwardMedia start, type:", message.type);
+
     const media = await message.downloadMedia();
+    console.log("[BOT] downloadMedia done, has data:", !!media?.data, "mimetype:", media?.mimetype);
+     
     if (!media?.data || !media?.mimetype) return;
 
     let sendMedia = media;
 
     if (message.type === "image") {
+      console.log("[BOT] compressing image...");
       const compressed = await compressImage(media.data);
+      
+      console.log("[BOT] compress image done, length:", compressed.length);
       sendMedia = {
         mimetype: "image/jpeg",
         data: compressed,
@@ -228,9 +235,13 @@ export class WhatsAppBotService {
     }
 
     if (message.type === "video") {
+      console.log("[BOT] compressing video...");
       const sizeMB = Buffer.from(media.data, "base64").length / 1024 / 1024;
+
       if (sizeMB <= this.maxSizeVideo) {
         const compressed = await compressVideo(media.data);
+        console.log("[BOT] compress video done, length:", compressed.length);
+
         sendMedia = {
           mimetype: "video/mp4",
           data: compressed,
@@ -252,6 +263,7 @@ export class WhatsAppBotService {
       `*Tipe*:\n${message.type.toUpperCase()}\n\n` +
       (bodyText ? `*Caption*:\n${safeBody(bodyText)}` : "");
 
+    console.log("[BOT] sending media to group...");
     const sentMessage = await whatsappService.sendMessage(
       this.whatsappRedirectGroupId!,
       sendMedia,
@@ -261,6 +273,8 @@ export class WhatsAppBotService {
       },
     );
 
+    console.log("[BOT] sent! id:", sentMessage.id._serialized);
+    
     this.replyMap.set(sentMessage.id._serialized, senderId);
   }
 
