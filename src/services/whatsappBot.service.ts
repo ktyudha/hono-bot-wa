@@ -333,26 +333,40 @@ export class WhatsAppBotService {
       const chats = await whatsappService.getChats();
       logger.bot(`get-chat: total chats ${chats.length}`);
 
+      const filtered = chats
+        .filter((c) => c.id?._serialized)
+        .slice(0, 10);
+
+      logger.bot(`get-chat: filtered ${filtered.length} chats`);
+
       const chatLines = await Promise.all(
-        chats
-          .filter((c) => c.id?._serialized)
-          .slice(0, 10)
-          .map(async (c) => {
-            const isGroup = c.id._serialized.endsWith("@g.us");
+        filtered.map(async (c) => {
+          const isGroup = c.id._serialized.endsWith("@g.us");
 
-            if (isGroup) {
-              logger.bot(`get-chat: group ${c.name} | ${c.id._serialized}`);
-              return `*${c.name}*\nID: ${c.id._serialized}`;
-            }
+          if (isGroup) {
+            logger.bot(`get-chat: group ${c.name} | ${c.id._serialized}`);
+            return `*${c.name}*\nID: ${c.id._serialized}`;
+          }
 
-            const contact = await c.getContact();
+          try {
+            const contact = await Promise.race([
+              c.getContact(),
+              new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("timeout")), 3000)
+              ),
+            ]) as any;
+
             const name = contact.pushname || contact.name || contact.number || c.id.user;
             const number = contact.number || contact.id.user;
             const link = generateWaLink(number);
 
             logger.bot(`get-chat: personal ${name} | ${number}`);
             return `*${name}* | +${number}\n${link}`;
-          })
+          } catch (err) {
+            logger.warn(`get-chat: gagal getContact ${c.id._serialized}: ${err}`);
+            return `*${c.id.user}*\nID: ${c.id._serialized}`;
+          }
+        })
       );
 
       await message.reply(`*Get Chat*\n\n${chatLines.join("\n\n")}`);
