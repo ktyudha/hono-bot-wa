@@ -241,11 +241,16 @@ export class WhatsAppBotService {
 
     if (!sendMedia?.data || !sendMedia?.mimetype) return;
 
+    const bodyText =
+      typeof message.body === "string" && message.body.length < 300
+        ? message.body
+        : "";
+
     const caption =
       `*Pesan Media*\n\n` +
       `*Dari*:\n${senderLabel}\n\n` +
       `*Tipe*:\n${message.type.toUpperCase()}\n\n` +
-      (message.body ? `*Caption*:\n${safeBody(message.body)}` : "");
+      (bodyText ? `*Caption*:\n${safeBody(bodyText)}` : "");
 
     const sentMessage = await whatsappService.sendMessage(
       this.whatsappRedirectGroupId!,
