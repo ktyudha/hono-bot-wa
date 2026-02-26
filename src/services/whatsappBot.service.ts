@@ -1,4 +1,4 @@
-import { Message, MessageTypes, MessageMedia, Buttons, List } from "whatsapp-web.js";
+import { Message, MessageTypes, MessageMedia } from "whatsapp-web.js";
 import { whatsappService } from "./whatsapp.service";
 import { generateWaLink } from "@/helpers/generateWaLink";
 import { compressImage, compressVideo } from "@/helpers/media";
@@ -96,14 +96,9 @@ export class WhatsAppBotService {
 
     const senderId = message.from;
 
-    // Fix senderLabel
     const contact = await message.getContact();
     const senderName = contact.pushname || contact.name || contact.number || senderId;
     const senderNumber = contact.number || contact.id.user || senderId;
-
-    // const senderLabel = senderId.endsWith("@lid")
-    //   ? senderId
-    //   : senderId.replace(/\D/g, "");
 
     const type = message.type as string;
 
@@ -232,6 +227,7 @@ export class WhatsAppBotService {
 
     if (message.type === "sticker") {
       logger.media("forwarding sticker...");
+      await this.sendHeaderMessage(senderName, senderNumber, "sticker");
       const sentMessage = await whatsappService.sendMessage(
         this.whatsappRedirectGroupId!,
         media,
@@ -244,6 +240,7 @@ export class WhatsAppBotService {
 
     if (message.type === "audio" || message.type === "ptt") {
       logger.media("forwarding audio...");
+      await this.sendHeaderMessage(senderName, senderNumber, message.type);
       const sentMessage = await whatsappService.sendMessage(
         this.whatsappRedirectGroupId!,
         media,
@@ -259,7 +256,10 @@ export class WhatsAppBotService {
       const sentMessage = await whatsappService.sendMessage(
         this.whatsappRedirectGroupId!,
         media,
-        { sendMediaAsDocument: true }
+        {
+          sendMediaAsDocument: true,
+          caption: this.buildSenderHeader(senderName, senderNumber, "document"),
+        }
       );
       logger.send(`sent! id: ${sentMessage.id._serialized}`);
       this.replyMap.set(sentMessage.id._serialized, senderId);
@@ -331,15 +331,17 @@ export class WhatsAppBotService {
 
     this.commands.set("get-chat", async (message) => {
       const chats = await whatsappService.getChats();
+      logger.bot(`get-chat: total chats ${chats.length}`);
 
       const chatLines = await Promise.all(
         chats
-          .filter((c) => c.id)
+          .filter((c) => c.id?._serialized)
           .slice(0, 10)
           .map(async (c) => {
             const isGroup = c.id._serialized.endsWith("@g.us");
 
             if (isGroup) {
+              logger.bot(`get-chat: group ${c.name} | ${c.id._serialized}`);
               return `*${c.name}*\nID: ${c.id._serialized}`;
             }
 
@@ -347,6 +349,8 @@ export class WhatsAppBotService {
             const name = contact.pushname || contact.name || contact.number || c.id.user;
             const number = contact.number || contact.id.user;
             const link = generateWaLink(number);
+
+            logger.bot(`get-chat: personal ${name} | ${number}`);
             return `*${name}* | +${number}\n${link}`;
           })
       );
@@ -422,5 +426,23 @@ export class WhatsAppBotService {
         `id._serialized: ${contact.id._serialized}`
       );
     });
+  }
+
+
+  /** HELPER */
+  private buildSenderHeader(senderName: string, senderNumber: string, type: string): string {
+    return safeString(
+      `*Pesan Masuk*\n\n` +
+      `*Dari*: ${senderName}\n` +
+      `*Nomor*: +${senderNumber}\n\n` +
+      `*Tipe*: ${type.toUpperCase()}`
+    );
+  }
+
+  private async sendHeaderMessage(senderName: string, senderNumber: string, type: string): Promise<void> {
+    await whatsappService.sendMessage(
+      this.whatsappRedirectGroupId!,
+      this.buildSenderHeader(senderName, senderNumber, type),
+    );
   }
 }
