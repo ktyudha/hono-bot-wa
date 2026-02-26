@@ -332,7 +332,6 @@ export class WhatsAppBotService {
     this.commands.set("get-chat", async (message) => {
       const chats = await whatsappService.getChats();
       logger.bot(`get-chat: total chats ${chats.length}`);
-      logger.bot(`get-chat: sample ${JSON.stringify(chats[0]?.id)}`);
 
       const filtered = chats
         .filter((c) => c.id?._serialized)
@@ -341,12 +340,17 @@ export class WhatsAppBotService {
       logger.bot(`get-chat: filtered ${filtered.length} chats`);
 
       const chatLines = await Promise.all(
-        filtered.map(async (c) => {
+        filtered.map(async (c, i) => {
           const isGroup = c.id._serialized.endsWith("@g.us");
 
           if (isGroup) {
+            const groupChat = c as any;
             logger.bot(`get-chat: group ${c.name} | ${c.id._serialized}`);
-            return `*${c.name}*\nID: ${c.id._serialized}`;
+            return [
+              `*${i + 1}. [Group] ${c.name}*`,
+              `id      : ${c.id._serialized}`,
+              `members : ${groupChat.participants?.length || "-"}`,
+            ].join("\n");
           }
 
           try {
@@ -359,18 +363,25 @@ export class WhatsAppBotService {
 
             const name = contact.pushname || contact.name || contact.number || c.id.user;
             const number = contact.number || contact.id.user;
-            const link = generateWaLink(number);
 
             logger.bot(`get-chat: personal ${name} | ${number}`);
-            return `*${name}* | +${number}\n${link}`;
+            return [
+              `*${i + 1}. ${name}*`,
+              `number  : +${number}`,
+              `id      : ${c.id._serialized}`,
+            ].join("\n");
           } catch (err) {
             logger.warn(`get-chat: gagal getContact ${c.id._serialized}: ${err}`);
-            return `*${c.id.user}*\nID: ${c.id._serialized}`;
+            return [
+              `*${i + 1}. ${c.id.user}*`,
+              `number  : +${c.id.user}`,
+              `id      : ${c.id._serialized}`,
+            ].join("\n");
           }
         })
       );
 
-      await message.reply(`*Get Chat*\n\n${chatLines.join("\n\n")}`);
+      await message.reply(`*Daftar Chat*\n\n${chatLines.join("\n\n")}`);
     });
 
     this.commands.set("send", async (message, args) => {
