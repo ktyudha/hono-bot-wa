@@ -216,20 +216,27 @@ export class WhatsAppBotService {
     console.log("[BOT] handleForwardMedia start, type:", message.type);
 
     const media = await message.downloadMedia();
-    console.log("[BOT] downloadMedia done, has data:", !!media?.data, "mimetype:", media?.mimetype);
-     
+    console.log(
+      "[BOT] downloadMedia done, has data:",
+      !!media?.data,
+      "mimetype:",
+      media?.mimetype,
+    );
+
     if (!media?.data || !media?.mimetype) return;
 
     let sendMedia = media;
 
     if (message.type === "image") {
-      console.log("[BOT] compressing image...");
-      const compressed = await compressImage(media.data);
-      
-      console.log("[BOT] compress image done, length:", compressed.length);
+      console.log("[BOT] skip compressing image...");
+      // console.log("[BOT] compressing image...");
+      // const compressed = await compressImage(media.data);
+
+      // console.log("[BOT] compress image done, length:", compressed.length);
       sendMedia = {
         mimetype: "image/jpeg",
-        data: compressed,
+        // data: compressed,
+        data: media.data.replace(/\s/g, ""),
         filename: "image.jpg",
       };
     }
@@ -274,7 +281,7 @@ export class WhatsAppBotService {
     );
 
     console.log("[BOT] sent! id:", sentMessage.id._serialized);
-    
+
     this.replyMap.set(sentMessage.id._serialized, senderId);
   }
 
