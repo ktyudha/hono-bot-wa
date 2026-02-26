@@ -270,21 +270,7 @@ export class WhatsAppBotService {
       },
     );
 
-    // const { MessageMedia } = await import("whatsapp-web.js");
-    // const mediaToSend = new MessageMedia(
-    //   sendMedia.mimetype,
-    //   sendMedia.data,
-    //   sendMedia.filename ?? null,
-    // );
-
-    // const sentMessage = await this.client.sendMessage(
-    //   this.whatsappRedirectGroupId!,
-    //   mediaToSend,
-    //   { caption: safeString(caption) },
-    // );
-
     console.log("[BOT] sent! id:", sentMessage.id._serialized);
-
     this.replyMap.set(sentMessage.id._serialized, senderId);
   }
 
