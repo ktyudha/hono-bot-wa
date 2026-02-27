@@ -1,12 +1,12 @@
 services:
   bot:
     build: .
-    container_name: hono-bot-wa
+    container_name: ${APP_NAME:-hono-bot-wa}
     ports:
       - "${PORT:-1997}:${PORT:-1997}"
     env_file:
       - .env
     volumes:
-      - /var/www/hono-bot-wa/.wwebjs_auth:/app/.wwebjs_auth
-      - /var/www/hono-bot-wa/.wwebjs_cache:/app/.wwebjs_cache
-    command: bun run --hot src/index.ts
+      - ./.wwebjs_auth:/app/.wwebjs_auth
+      - ./.wwebjs_cache:/app/.wwebjs_cache
+    command: bun run start
