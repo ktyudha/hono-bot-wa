@@ -42,4 +42,4 @@ VOLUME ["/app/data"]
 
 # Jalankan Hono dengan hot reload
 # CMD ["bun", "run", "--hot", "src/index.ts"]
-CMD ["bun", "run", "src/index.ts"]
+CMD ["bun", "run", "start"]

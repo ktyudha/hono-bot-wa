@@ -9,4 +9,4 @@ services:
     volumes:
       - ./.wwebjs_auth:/app/.wwebjs_auth
       - ./.wwebjs_cache:/app/.wwebjs_cache
-    command: bun run --hot src/index.ts
+    command: bun run start
