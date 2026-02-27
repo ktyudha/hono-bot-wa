@@ -1,7 +1,10 @@
-FROM oven/bun:1.2
+# Gunakan image resmi Bun
+FROM oven/bun:latest
 
+# Set working directory
 WORKDIR /app
 
+# Install Chromium & dependencies untuk Puppeteer
 RUN apt-get update && apt-get install -y \
     chromium \
     ffmpeg \
@@ -25,9 +28,18 @@ RUN apt-get update && apt-get install -y \
     unzip \
  && rm -rf /var/lib/apt/lists/*
 
-COPY package.json bun.lock* ./
+# Salin package.json dan bun.lockb untuk caching
+COPY package.json bun.lockb* ./
+
+# Install dependencies
 RUN bun install
 
+# Salin semua source code
 COPY . .
 
-CMD ["bun", "run", "start"]
+# Volume untuk session WhatsApp
+VOLUME ["/app/data"]
+
+# Jalankan Hono dengan hot reload
+# CMD ["bun", "run", "--hot", "src/index.ts"]
+CMD ["bun", "run", "src/index.ts"]
