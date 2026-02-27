@@ -1,10 +1,26 @@
-const tag = (label: string) => `[${label}]`;
+import pino from "pino";
 
-export const logger = {
-    bot: (msg: string, ...args: unknown[]) => console.log(tag("BOT"), msg, ...args),
-    error: (msg: string, ...args: unknown[]) => console.error(tag("BOT:ERROR"), msg, ...args),
-    warn: (msg: string, ...args: unknown[]) => console.warn(tag("BOT:WARN"), msg, ...args),
-    send: (msg: string, ...args: unknown[]) => console.log(tag("BOT:SEND"), msg, ...args),
-    media: (msg: string, ...args: unknown[]) => console.log(tag("BOT:MEDIA"), msg, ...args),
-    cmd: (msg: string, ...args: unknown[]) => console.log(tag("BOT:CMD"), msg, ...args),
+const isDev = process.env.NODE_ENV !== "production";
+
+const logger = pino({
+    level: process.env.LOG_LEVEL || "info",
+    ...(isDev && {
+        transport: {
+            target: "pino-pretty",
+            options: {
+                colorize: true,
+                translateTime: "SYS:standard",
+                ignore: "pid,hostname",
+            },
+        },
+    }),
+});
+
+export const log = {
+    bot: (msg: string, ...args: unknown[]) => logger.info({ args }, msg),
+    error: (msg: string, ...args: unknown[]) => logger.error({ args }, msg),
+    warn: (msg: string, ...args: unknown[]) => logger.warn({ args }, msg),
+    send: (msg: string, ...args: unknown[]) => logger.debug({ args }, msg),
+    media: (msg: string, ...args: unknown[]) => logger.debug({ args }, msg),
+    cmd: (msg: string, ...args: unknown[]) => logger.debug({ args }, msg),
 };

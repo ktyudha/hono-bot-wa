@@ -4,8 +4,6 @@ import fs from "fs";
 
 import { whatsappService } from "../services/whatsapp.service";
 
-// Temporary Directory
-const temporaryDirectory = path.join(process.cwd(), "tmp");
 export class WhatsAppController {
   public async getStatus(c: Context) {
     try {

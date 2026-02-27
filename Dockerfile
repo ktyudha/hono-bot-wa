@@ -21,7 +21,6 @@ RUN apt-get update && apt-get install -y \
     libgbm1 \
     libpango-1.0-0 \
     libatk1.0-0 \
-    libatk-bridge2.0-0 \
     libdrm2 \
     ca-certificates \
     fonts-liberation \
@@ -43,4 +42,4 @@ VOLUME ["/app/data"]
 
 # Jalankan Hono dengan hot reload
 # CMD ["bun", "run", "--hot", "src/index.ts"]
-CMD ["bun", "run", "src/index.ts"]
+CMD ["bun", "run", "start"]
