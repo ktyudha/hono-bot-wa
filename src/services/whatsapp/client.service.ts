@@ -30,16 +30,17 @@ export function createWhatsAppClient(): Client {
         puppeteer: {
             headless: true,
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+            dumpio: true,
             args: [
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
                 "--disable-dev-shm-usage",
                 "--disable-accelerated-2d-canvas",
                 "--no-first-run",
-                "--no-zygote",
                 "--disable-gpu",
                 "--disable-extensions",
-                "--single-process",
+                // "--no-zygote",
+                // "--single-process",
             ],
         },
     });
