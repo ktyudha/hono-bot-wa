@@ -19,9 +19,14 @@ export async function handleForwardToGroup(
     }
 
     const senderId = message.from;
-    const contact = await message.getContact();
-    const senderName = contact.pushname || contact.name || contact.number || senderId;
-    const senderNumber = contact.id.user || contact.number || senderId;
+    let contact: any = null;
+    try {
+        contact = await message.getContact();
+    } catch (err) {
+        log.warn(`getContact failed, using fallback | from: ${senderId} | error: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    const senderName = contact?.pushname || contact?.name || contact?.number || senderId;
+    const senderNumber = contact?.id?.user || contact?.number || senderId;
     const type = message.type as string;
 
     log.bot(`forwarding to group | from: ${senderName} (${senderNumber}) | type: ${type}`);
@@ -235,10 +240,15 @@ export async function handleForwardOutgoingToGroup(
     }
 
     const recipientId = message.to;
-    const contact = await whatsappService.getContactById(recipientId);
+    let contact: any = null;
+    try {
+        contact = await whatsappService.getContactById(recipientId);
+    } catch (err) {
+        log.warn(`getContactById failed, using fallback | to: ${recipientId} | error: ${err instanceof Error ? err.message : String(err)}`);
+    }
 
-    const recipientName = contact.pushname || contact.name || contact.number || recipientId;
-    const recipientNumber = contact.id.user || contact.number || recipientId;
+    const recipientName = contact?.pushname || contact?.name || contact?.number || recipientId;
+    const recipientNumber = contact?.id?.user || contact?.number || recipientId;
     const type = message.type as string;
 
     log.bot(`forwarding outgoing to group | to: ${recipientName} (${recipientNumber}) | type: ${type}`);

@@ -66,13 +66,20 @@ export class WhatsAppEventHandler {
         const from = message.from;
         const type = message.type;
 
-        if (this.processedMessages.has(msgId)) {
-            log.bot(`skip duplicate | id: ${msgId}`);
-            return;
-        }
+        if (msgId) {
+            if (this.processedMessages.has(msgId)) {
+                log.bot(`skip duplicate | id: ${msgId}`);
+                return;
+            }
 
-        this.processedMessages.add(msgId);
-        setTimeout(() => this.processedMessages.delete(msgId), 60_000);
+            this.processedMessages.add(msgId);
+            setTimeout(() => this.processedMessages.delete(msgId), 60_000);
+        } else {
+            // Some messages (e.g. from @lid JIDs) arrive without a serialized id.
+            // Without this guard, a single undefined id poisons the Set and causes
+            // every other message to be falsely skipped as a "duplicate" for 60s.
+            log.warn(`message has no id, skipping dedup check | from: ${from} | type: ${type}`);
+        }
 
         log.bot(`message received | from: ${from} | type: ${type} | id: ${msgId}`);
 
