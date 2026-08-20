@@ -32,11 +32,11 @@ RUN apt-get update && apt-get install -y \
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-# Salin package.json dan bun.lockb untuk caching
-COPY package.json bun.lockb* ./
+# Salin package.json dan bun.lock untuk caching
+COPY package.json bun.lock ./
 
-# Install dependencies
-RUN bun install
+# Install dependencies (frozen-lockfile agar versi yang ter-install sama persis dengan bun.lock)
+RUN bun install --frozen-lockfile
 RUN sed -i 's/if (!fileOptions.contentType)/if (false)/' /app/node_modules/node-telegram-bot-api/src/utils.js
 
 # Salin semua source code
