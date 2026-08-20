@@ -1,5 +1,6 @@
-# Gunakan image resmi Bun
-FROM oven/bun:latest
+# Gunakan image resmi Bun (dipin ke versi yang sama dengan yang menghasilkan bun.lock,
+# supaya bun install --frozen-lockfile konsisten dan tidak terpengaruh update image "latest")
+FROM oven/bun:1.2.20
 
 # Set working directory
 WORKDIR /app
