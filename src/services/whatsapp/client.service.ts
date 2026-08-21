@@ -27,12 +27,6 @@ export function createWhatsAppClient(): Client {
         authStrategy: new LocalAuth({
             dataPath: "/app/.wwebjs_auth",
         }),
-        webVersion: "2.3000.1021104826",
-        webVersionCache: {
-            type: "remote",
-            remotePath:
-                "https://raw.githubusercontent.com/wwebjs/wwebjs-remote-assets/main/cache/",
-        },
         puppeteer: {
             headless: true,
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
@@ -42,9 +36,9 @@ export function createWhatsAppClient(): Client {
                 "--disable-dev-shm-usage",
                 "--disable-accelerated-2d-canvas",
                 "--no-first-run",
+                "--no-zygote",
                 "--disable-gpu",
                 "--disable-extensions",
-                "--no-zygote",
                 "--single-process",
             ],
         },

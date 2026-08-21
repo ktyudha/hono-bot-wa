@@ -9,16 +9,6 @@ type MessageHandler = (message: Message) => Promise<void>;
 export class WhatsAppEventHandler {
     private processedMessages: Set<string> = new Set();
 
-    // All message handling ends up calling client.pupPage.evaluate() (sendMessage,
-    // downloadMedia, getContact, ...) against the same Puppeteer page. Running those
-    // concurrently for different messages corrupts the shared execution context, so
-    // every message is chained through this queue and processed one at a time.
-    private queue: Promise<void> = Promise.resolve();
-
-    private enqueue(task: () => Promise<void>): void {
-        this.queue = this.queue.then(task, task);
-    }
-
     constructor(
         private readonly messageHandlers: MessageHandler[],
         private readonly state: WhatsAppState,
@@ -59,15 +49,15 @@ export class WhatsAppEventHandler {
             await this.onDisconnected();
         });
 
-        client.on("message", (message: Message) => {
-            this.enqueue(() => this.handleMessage(message));
+        client.on("message", async (message: Message) => {
+            await this.handleMessage(message);
         });
 
         // Capture outgoing messages sent from the phone (not triggered by "message" event)
-        client.on("message_create", (message: Message) => {
+        client.on("message_create", async (message: Message) => {
             if (!message.fromMe) return;
             if (wasBotSent(message.id._serialized)) return;
-            this.enqueue(() => this.handleMessage(message));
+            await this.handleMessage(message);
         });
     }
 

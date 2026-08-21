@@ -1,6 +1,5 @@
-# Gunakan image resmi Bun (dipin ke versi yang sama dengan yang menghasilkan bun.lock,
-# supaya bun install --frozen-lockfile konsisten dan tidak terpengaruh update image "latest")
-FROM oven/bun:1.2.20
+# Gunakan image resmi Bun
+FROM oven/bun:latest
 
 # Set working directory
 WORKDIR /app
@@ -33,11 +32,11 @@ RUN apt-get update && apt-get install -y \
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-# Salin package.json dan bun.lock untuk caching
-COPY package.json bun.lock ./
+# Salin package.json dan bun.lockb untuk caching
+COPY package.json bun.lockb* ./
 
-# Install dependencies (frozen-lockfile agar versi yang ter-install sama persis dengan bun.lock)
-RUN bun install --frozen-lockfile
+# Install dependencies
+RUN bun install
 RUN sed -i 's/if (!fileOptions.contentType)/if (false)/' /app/node_modules/node-telegram-bot-api/src/utils.js
 
 # Salin semua source code
